@@ -1,0 +1,28 @@
+# Compiled binaries & build artifacts
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace & build cache
+go.work
+go.work.sum
+.build-cache/
+
+# Local runtime config (if run from working directory)
+standing_orders.json
+
+# IDE & Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS metadata
+Thumbs.db
+Desktop.ini
+.DS_Store
