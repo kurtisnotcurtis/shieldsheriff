@@ -1,7 +1,5 @@
 # ★ ShieldSheriff
 
-**User-Elected Governor for Windows 11 Microsoft Defender.**
+**Put Windows Defender Under Your Command — Nag-Free Standing Orders for Windows 11 24H2.**
 
-Work-in-progress native Go utility to inspect and lock granular Windows Defender
-settings (`Real-Time Protection`, `Cloud-delivered protection`, `Sample submission`)
-on Windows 11 24H2 without disabling the `WinDefend` service.
+- Locks `SpynetReporting=0` and `SubmitSamplesConsent=2` without triggering Windows 11 24H2 `SecurityHealthService` toast nags (`DisableEnhancedNotifications=1`).
