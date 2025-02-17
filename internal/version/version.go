@@ -1,10 +1,10 @@
 package version
 
 const (
-	Version                = "2024.12.1"
-	Codename               = "First Badge"
-	ReleasedOn             = "2024-12-15"
-	TestedWinBuild         = "Windows 11 23H2 / 24H2 (26100.2314)"
-	TestedDefenderPlatform = "4.18.24090.11"
-	TestedWscSchema        = "WSC-2024.12 (HKLM Policy Locks)"
+	Version                = "2025.02.1"
+	Codename               = "Silent Star"
+	ReleasedOn             = "2025-02-16"
+	TestedWinBuild         = "Windows 11 24H2 (26100.3194)"
+	TestedDefenderPlatform = "4.18.25010.11"
+	TestedWscSchema        = "WSC-2025.02 (DisableNotifications + DisableEnhancedNotifications)"
 )
