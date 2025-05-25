@@ -267,7 +267,12 @@ func Enforce(orders StandingOrders, standDown *StandDownState) EnforceResult {
 	_ = regWriteDword(hkeyLocalMachine, defSpynet, "SubmitSamplesConsent", orders.SampleSubmission)
 	_ = regWriteDword(hkeyLocalMachine, defNetProt, "EnableNetworkProtection", orders.NetworkProtection)
 
-	// Note: Policy + live registry keys applied for Defender 4.18.24090+
+	// 6. Live WMI MSFT_MpPreference Sync via DCOM CimSession (works even when WinRM/WSMan is off)
+	if err := syncWMIPreferences(effectiveRTP, orders); err != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("WMI live sync note: %v (Policy registry locks are still applied)", err))
+	} else {
+		res.Applied = append(res.Applied, "Synchronized live MsMpEng.exe engine via WMI (MSFT_MpPreference)")
+	}
 
 	return res
 }
@@ -283,8 +288,7 @@ func syncWMIPreferences(effectiveRTP bool, orders StandingOrders) error {
 	// Build a single fast PowerShell command using DCOM CimSession so it never fails on disabled WSMan
 	script := fmt.Sprintf(
 		`$ErrorActionPreference = 'Stop'; `+
-			`$opt = New-CimSessionOption -Protocol Dcom; `+
-			`$s = New-CimSession -SessionOption $opt; `+
+			`$s = New-CimSession; `+
 			`try { `+
 			`Set-MpPreference -CimSession $s `+
 			`-DisableRealtimeMonitoring %s `+
