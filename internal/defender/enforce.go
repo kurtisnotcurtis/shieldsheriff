@@ -288,7 +288,8 @@ func syncWMIPreferences(effectiveRTP bool, orders StandingOrders) error {
 	// Build a single fast PowerShell command using DCOM CimSession so it never fails on disabled WSMan
 	script := fmt.Sprintf(
 		`$ErrorActionPreference = 'Stop'; `+
-			`$s = New-CimSession; `+
+			`$opt = New-CimSessionOption -Protocol Dcom; `+
+			`$s = New-CimSession -SessionOption $opt; `+
 			`try { `+
 			`Set-MpPreference -CimSession $s `+
 			`-DisableRealtimeMonitoring %s `+
