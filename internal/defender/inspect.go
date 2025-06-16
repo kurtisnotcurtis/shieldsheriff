@@ -179,9 +179,12 @@ func Inspect(orders *StandingOrders, standDown *StandDownState) DeputyStatus {
 	}
 
 	// 2. Tamper Protection
+	// In Windows 11 Defender:
+	// 0x0 or 0x4 = Disabled (bit 0 is 0)
+	// 0x1 or 0x5 = Enabled  (bit 0 is 1)
 	if tp, ok := regReadDword(hkeyLocalMachine, defFeatures, "TamperProtection"); ok {
 		st.TamperProtectionRaw = tp
-		st.TamperProtectionActive = (tp == 1)
+		st.TamperProtectionActive = (tp & 0x1) != 0
 	}
 	if tps, ok := regReadDword(hkeyLocalMachine, defFeatures, "TamperProtectionSource"); ok {
 		st.TamperProtectionSource = tps
