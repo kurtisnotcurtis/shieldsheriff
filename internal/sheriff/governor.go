@@ -269,8 +269,8 @@ func (g *Governor) tick() {
 		stateChanged = true
 	}
 
-	// 2. Check AutoStandDownProcesses (disabled in early build)
-	if false && len(g.orders.AutoStandDownProcesses) > 0 {
+	// 2. Check AutoStandDownProcesses
+	if len(g.orders.AutoStandDownProcesses) > 0 {
 		matched := FindRunningWatchedProcess(g.orders.AutoStandDownProcesses)
 		if matched != "" && !g.standDown.Active {
 			g.standDown = defender.StandDownState{
