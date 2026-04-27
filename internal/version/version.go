@@ -1,10 +1,10 @@
 package version
 
 const (
-	Version                = "2025.12.1"
-	Codename               = "Night Watch"
-	ReleasedOn             = "2025-12-21"
-	TestedWinBuild         = "Windows 11 24H2 (26100.2605)"
-	TestedDefenderPlatform = "4.18.25110.6"
-	TestedWscSchema        = "WSC-2025.12 (Native SCM SYSTEM Service + 5s Drift Guard)"
+	Version                = "2026.04.1"
+	Codename               = "Gold Star"
+	ReleasedOn             = "2026-04-26"
+	TestedWinBuild         = "Windows 11 24H2 (26100.712)"
+	TestedDefenderPlatform = "4.18.26030.2"
+	TestedWscSchema        = "WSC-2026.04 (Win32 Shell_NotifyIconW Tray + ARGB HICON)"
 )
