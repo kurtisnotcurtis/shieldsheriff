@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShieldSheriff — Command Center</title>
+<style>
+  :root {
+    --bg: #0b0f19;
+    --panel: #111827;
+    --panel-alt: #1e293b;
+    --border: #26334d;
+    --gold: #facc15;
+    --gold-dim: rgba(250, 204, 21, 0.14);
+    --cyan: #38bdf8;
+    --cyan-dim: rgba(56, 189, 248, 0.14);
+    --green: #22c55e;
+    --green-dim: rgba(34, 197, 94, 0.14);
+    --amber: #fb923c;
+    --amber-dim: rgba(251, 146, 60, 0.15);
+    --text: #f8fafc;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: radial-gradient(circle at top right, #172036 0%, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 22px 26px 40px;
+    line-height: 1.45;
+  }
+  .container { max-width: 1120px; margin: 0 auto; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    background: rgba(17, 24, 39, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+    margin-bottom: 18px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand svg { width: 44px; height: 44px; flex-shrink: 0; filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.25)); }
+  .brand h1 { font-size: 1.38rem; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+  .brand p { font-size: 0.83rem; color: var(--muted); }
+
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .pill.gold { background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(250, 204, 21, 0.35); }
+  .pill.green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.35); }
+  .pill.cyan { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.35); }
+  .pill.amber { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251, 146, 60, 0.4); }
+
+  /* Buttons */
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--panel-alt);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
+  }
+  button:hover { border-color: var(--gold); background: #26354f; }
+  button.primary {
+    background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+    color: #0f172a;
+    border-color: #facc15;
+  }
+  button.primary:hover { filter: brightness(1.06); }
+  button.warn {
+    background: var(--amber-dim);
+    color: var(--amber);
+    border-color: rgba(251, 146, 60, 0.45);
+  }
+
+  /* Alert Callouts */
+  .callout {
+    padding: 14px 18px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .callout.amber {
+    background: rgba(251, 146, 60, 0.1);
+    border: 1px solid rgba(251, 146, 60, 0.4);
+  }
+  .callout.cyan {
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+  }
+  .callout h3 { font-size: 0.92rem; margin-bottom: 3px; }
+  .callout p { font-size: 0.81rem; color: var(--muted); }
+
+  /* Presets Bar */
+  .section-title {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 900px) { .presets-grid { grid-template-columns: repeat(2, 1fr); } }
+  .preset-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 13px 15px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .preset-card:hover { border-color: rgba(250, 204, 21, 0.55); transform: translateY(-1px); }
+  .preset-card.active {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(250, 204, 21, 0.10) 0%, var(--panel) 100%);
+    box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.25);
+  }
+  .preset-card h4 { font-size: 0.89rem; color: var(--text); margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between; }
+  .preset-card p { font-size: 0.76rem; color: var(--muted); }
+
+  /* Main 2-column Grid */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 18px;
+  }
+  @media (max-width: 920px) { .main-grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    font-size: 0.98rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card .sub { font-size: 0.79rem; color: var(--muted); margin-bottom: 14px; }
+
+  /* Toggle Rows */
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 11px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .setting-row:first-of-type { border-top: none; }
+  .setting-info h4 { font-size: 0.87rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .setting-info p { font-size: 0.76rem; color: var(--muted); }
+  .live-tag {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.07);
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* Switch */
+  .switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #334155;
+    transition: .2s;
+    border-radius: 24px;
+  }
+  .slider:before {
+    position: absolute; content: "";
+    height: 18px; width: 18px;
+    left: 3px; bottom: 3px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+  }
+  input:checked + .slider { background-color: var(--gold); }
+  input:checked + .slider:before { transform: translateX(20px); background-color: #0f172a; }
+
+  select, input[type="text"] {
+    background: var(--panel-alt);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 0.81rem;
+    font-family: inherit;
+  }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* Telemetry KV & Audit Log */
+  .kv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .kv-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 8px 11px;
+  }
+  .kv-box span { display: block; font-size: 0.7rem; color: var(--muted); }
+  .kv-box strong { font-size: 0.83rem; }
+
+  .audit-list {
+    max-height: 185px;
+    overflow-y: auto;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 0.74rem;
+    background: #080b12;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .audit-item { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); color: #cbd5e1; }
+  .audit-item .ts { color: var(--muted); margin-right: 6px; }
+  .audit-item .cat { color: var(--gold); font-weight: 700; margin-right: 6px; }
+
+  #toast {
+    position: fixed;
+    bottom: 20px;
+    right: 24px;
+    background: #1e293b;
+    border: 1px solid var(--gold);
+    color: var(--text);
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: none;
+    z-index: 1000;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="32" cy="32" r="30" fill="#0F172A" stroke="#B47309" stroke-width="2.5"/>
+        <polygon points="32,7 38.5,20.5 53.5,19.5 45,32 53.5,44.5 38.5,43.5 32,57 25.5,43.5 10.5,44.5 19,32 10.5,19.5 25.5,20.5" fill="#FACC15" stroke="#B47309" stroke-width="1.8"/>
+        <circle cx="32" cy="6" r="2.7" fill="#FACC15"/>
+        <circle cx="54.5" cy="19" r="2.7" fill="#FACC15"/>
+        <circle cx="54.5" cy="45" r="2.7" fill="#FACC15"/>
+        <circle cx="32" cy="58" r="2.7" fill="#FACC15"/>
+        <circle cx="9.5" cy="45" r="2.7" fill="#FACC15"/>
+        <circle cx="9.5" cy="19" r="2.7" fill="#FACC15"/>
+        <circle cx="32" cy="32" r="7.5" fill="#0F172A" stroke="#B47309" stroke-width="2"/>
+        <circle cx="32" cy="32" r="3.2" fill="#FACC15"/>
+      </svg>
+      <div>
+        <h1>ShieldSheriff <span class="pill gold" id="complianceBadge">Inspecting...</span></h1>
+        <p>User-Elected Orchestrator for Windows Defender &bull; Nag-Free Granular Standing Orders</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="pill" id="elevationBadge">Checking Privilege...</span>
+      <button class="warn" id="btnElevate" style="display:none" onclick="elevateApp()">&#9889; Relaunch as Admin</button>
+      <button onclick="enforceNow()" class="primary">Enforce Standing Orders</button>
+    </div>
+  </header>
+
+  <!-- Tamper Protection Handoff Banner -->
+  <div class="callout amber" id="tamperBanner">
+    <div>
+      <h3>One-Time Tamper Protection Handoff Needed</h3>
+      <p>Windows Defender's kernel driver (<code>WdFilter.sys</code>) currently has <strong>Tamper Protection ON</strong>, which blocks third-party policy locks. Flip Tamper Protection OFF once in Windows Security so ShieldSheriff can lock your Standing Orders permanently.</p>
+    </div>
+    <button class="warn" onclick="apiCall('/api/open-winsec')">Open Windows Security</button>
+  </div>
+
+  <!-- Active Stand-Down Banner -->
+  <div class="callout cyan" id="standDownBanner">
+    <div>
+      <h3 id="standDownTitle">Deputy Standing Down</h3>
+      <p id="standDownDesc">Real-Time Protection is temporarily paused. ShieldSheriff will automatically restore your Standing Orders when complete.</p>
+    </div>
+    <button onclick="standDown(0)">Resume Duty Now</button>
+  </div>
+
+  <!-- Presets -->
+  <div class="section-title">Standing Order Presets</div>
+  <div class="presets-grid" id="presetsGrid"></div>
+
+  <div class="main-grid">
+    <!-- Left Column: Granular Standing Orders -->
+    <div>
+      <!-- Keep the Peace -->
+      <div class="card">
+        <h2>Keep the Peace (Nag &amp; Notification Suppression)</h2>
+        <div class="sub">Silence Windows 11's "Action Needed" toast nags when Cloud Protection, Sample Submission, Tamper Protection, or Real-Time Protection are intentionally off.</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Silence All Windows Security Nags <span class="live-tag" id="liveNagTag"></span></h4>
+            <p>Sets <code>DisableNotifications=1</code>, <code>DisableEnhancedNotifications=1</code>, and <code>Notification_Suppress=1</code>.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkSuppressAllNags" onchange="saveOrdersFromUI()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Mute Default Windows Security Tray Icon <span class="live-tag" id="liveTrayTag"></span></h4>
+            <p>Hides <code>SecurityHealthSystray.exe</code> (with automatic backup) so only the honest ShieldSheriff star remains.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkMuteSystray" onchange="saveOrdersFromUI()">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Cloud & Telemetry -->
+      <div class="card">
+        <h2>Cloud Lookup &amp; Sample Telemetry</h2>
+        <div class="sub">Control whether Defender sends file metadata or automatic file samples to Microsoft MAPS servers.</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Cloud-Delivered Protection (MAPS) <span class="live-tag" id="liveCloudTag"></span></h4>
+            <p>Policy lock on <code>SpynetReporting</code> &amp; <code>MAPSReporting</code>.</p>
+          </div>
+          <select id="selCloud" onchange="saveOrdersFromUI()">
+            <option value="0">OFF — Disabled Permanently (0)</option>
+            <option value="1">Basic Membership (1)</option>
+            <option value="2">Advanced Membership (2)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Automatic Sample Submission <span class="live-tag" id="liveSamplesTag"></span></h4>
+            <p>Policy lock on <code>SubmitSamplesConsent</code> so personal files are never uploaded automatically.</p>
+          </div>
+          <select id="selSamples" onchange="saveOrdersFromUI()">
+            <option value="2">Never Send — Disabled Permanently (2)</option>
+            <option value="0">Always Prompt (0)</option>
+            <option value="1">Send Safe Samples Only (1)</option>
+            <option value="3">Send All Samples (3)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Local Deputy Engine Toggles -->
+      <div class="card">
+        <h2>Granular Deputy Engine Controls</h2>
+        <div class="sub">Direct the built-in <code>MsMpEng.exe</code> engine components independently without 24-hour auto-resets.</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Real-Time File Protection <span class="live-tag" id="liveRtpTag"></span></h4>
+            <p>On-access file scanning (<code>DisableRealtimeMonitoring</code>). On-demand scans still work when OFF.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkRealtime" onchange="saveOrdersFromUI()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Behavior Monitoring <span class="live-tag" id="liveBmTag"></span></h4>
+            <p>Heuristic process behavior monitoring (<code>DisableBehaviorMonitoring</code>).</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkBehavior" onchange="saveOrdersFromUI()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Downloaded Files &amp; Attachments Scan (IOAV) <span class="live-tag" id="liveIoavTag"></span></h4>
+            <p>Scans files marked with Mark-of-the-Web from browsers/email (<code>DisableIOAVProtection</code>).</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkIOAV" onchange="saveOrdersFromUI()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Script Scanning (AMSI) <span class="live-tag" id="liveScriptTag"></span></h4>
+            <p>Scans PowerShell/JS/VBScript execution (<code>DisableScriptScanning</code>).</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkScript" onchange="saveOrdersFromUI()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Network Protection (Exploit Guard) <span class="live-tag" id="liveNetTag"></span></h4>
+            <p>Blocks outbound connections to known phishing/C2 domains (<code>EnableNetworkProtection</code>).</p>
+          </div>
+          <select id="selNetwork" onchange="saveOrdersFromUI()">
+            <option value="0">OFF (0)</option>
+            <option value="1">Enabled / Block (1)</option>
+            <option value="2">Audit Mode Only (2)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Stand-Down, Service, Telemetry & Audit -->
+    <div>
+      <!-- Stand-Down Timer & Process Watch -->
+      <div class="card">
+        <h2>Deputy Stand-Down (Temporary Pause)</h2>
+        <div class="sub">Pause Real-Time Protection for a fixed duration or automatically whenever compiler/game processes run.</div>
+
+        <div class="btn-row">
+          <button onclick="standDown(15)">Pause 15m</button>
+          <button onclick="standDown(30)">Pause 30m</button>
+          <button onclick="standDown(60)">Pause 1h</button>
+          <button onclick="standDown(240)">Pause 4h</button>
+          <button onclick="standDown(0)">Resume Now</button>
+        </div>
+
+        <div class="setting-row" style="margin-top: 12px;">
+          <div class="setting-info" style="width:100%">
+            <h4>Auto Stand-Down Process Watchlist</h4>
+            <p style="margin-bottom:6px">Comma-separated executables (e.g. <code>cargo.exe, msbuild.exe, link.exe</code>) that automatically pause Real-Time Protection while active:</p>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="txtWatchProcs" style="flex:1" placeholder="cargo.exe, msbuild.exe, rustc.exe">
+              <button onclick="saveOrdersFromUI()">Save Watchlist</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deputy Actions & Persistence -->
+      <div class="card">
+        <h2>Deputy Operations &amp; 24/7 Service</h2>
+        <div class="sub">Trigger manual Defender tasks even when Real-Time Protection is OFF, or install the background SYSTEM service.</div>
+
+        <div class="btn-row" style="margin-bottom: 12px;">
+          <button onclick="apiCall('/api/quick-scan')">Run Quick Scan</button>
+          <button onclick="apiCall('/api/update-sigs')">Update Signatures</button>
+          <button onclick="apiCall('/api/open-winsec')">Windows Security UI</button>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <h4>Auto-Heal Windows Update Drift</h4>
+            <p>Continuously verify and restore Standing Orders every 5 seconds.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chkEnforceLoop" onchange="saveOrdersFromUI()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <button onclick="apiCall('/api/service-install')">Install 24/7 SYSTEM Service</button>
+          <button onclick="apiCall('/api/service-uninstall')">Remove SYSTEM Service</button>
+        </div>
+      </div>
+
+      <!-- Live Telemetry & Audit Log -->
+      <div class="card">
+        <h2>Live Deputy Telemetry &amp; Audit Log</h2>
+        <div class="sub" id="cfgPathLabel">Inspecting HKLM\SOFTWARE\Microsoft\Windows Defender...</div>
+
+        <div class="kv-grid">
+          <div class="kv-box">
+            <span>Tamper Protection</span>
+            <strong id="kvTamper">—</strong>
+          </div>
+          <div class="kv-box">
+            <span>Defender Service</span>
+            <strong id="kvService">—</strong>
+          </div>
+          <div class="kv-box">
+            <span>Platform Version</span>
+            <strong id="kvPlatform">—</strong>
+          </div>
+          <div class="kv-box">
+            <span>Signature Version</span>
+            <strong id="kvSig">—</strong>
+          </div>
+        </div>
+
+        <div class="audit-list" id="auditList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let currentState = null;
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+
+async function fetchState() {
+  try {
+    const res = await fetch('/api/state');
+    const data = await res.json();
+    currentState = data;
+    renderState(data);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderState(data) {
+  const st = data.status;
+  const ord = data.orders;
+  const sd = data.standDown;
+  if (data.version && data.version.version) {
+    const vEl = document.getElementById('versionBadge');
+    if (vEl) vEl.textContent = 'v' + data.version.version;
+  }
+
+  // Compliance Pill
+  const compEl = document.getElementById('complianceBadge');
+  if (sd.active) {
+    compEl.className = 'pill cyan';
+    compEl.textContent = 'STAND-DOWN ACTIVE';
+  } else if (st.inCompliance) {
+    compEl.className = 'pill green';
+    compEl.textContent = '★ KEEPING THE PEACE';
+  } else {
+    compEl.className = 'pill amber';
+    compEl.textContent = st.driftItems.length + ' DRIFT ITEM(S)';
+  }
+
+  // Elevation Pill
+  const elevEl = document.getElementById('elevationBadge');
+  const btnElev = document.getElementById('btnElevate');
+  if (st.isElevated) {
+    elevEl.className = 'pill gold';
+    elevEl.textContent = '★ SHERIFF SWORN IN (ADMIN)';
+    btnElev.style.display = 'none';
+  } else {
+    elevEl.className = 'pill amber';
+    elevEl.textContent = 'READ-ONLY (UNPRIVILEGED)';
+    btnElev.style.display = 'inline-block';
+  }
+
+  // Callout banners
+  document.getElementById('tamperBanner').style.display = st.tamperProtectionActive ? 'flex' : 'none';
+  const sdBanner = document.getElementById('standDownBanner');
+  if (sd.active) {
+    sdBanner.style.display = 'flex';
+    document.getElementById('standDownTitle').textContent = 'Deputy Standing Down — ' + sd.reason;
+  } else {
+    sdBanner.style.display = 'none';
+  }
+
+  // Presets
+  const pGrid = document.getElementById('presetsGrid');
+  pGrid.innerHTML = '';
+  (data.presets || []).forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'preset-card' + (ord.presetName === p.id ? ' active' : '');
+    div.onclick = () => applyPreset(p.id);
+    div.innerHTML = `<h4>${p.name} ${ord.presetName === p.id ? '<span>★</span>' : ''}</h4><p>${p.description}</p>`;
+    pGrid.appendChild(div);
+  });
+
+  // Form controls
+  document.getElementById('chkSuppressAllNags').checked = !!ord.suppressAllNags;
+  document.getElementById('chkMuteSystray').checked = !!ord.muteWindowsSecSystray;
+  document.getElementById('selCloud').value = String(ord.cloudProtection);
+  document.getElementById('selSamples').value = String(ord.sampleSubmission);
+  document.getElementById('chkRealtime').checked = !!ord.realtimeProtection;
+  document.getElementById('chkBehavior').checked = !!ord.behaviorMonitoring;
+  document.getElementById('chkIOAV').checked = !!ord.ioavProtection;
+  document.getElementById('chkScript').checked = !!ord.scriptScanning;
+  document.getElementById('selNetwork').value = String(ord.networkProtection);
+  document.getElementById('chkEnforceLoop').checked = !!ord.enforceLoop;
+
+  if (document.activeElement !== document.getElementById('txtWatchProcs')) {
+    document.getElementById('txtWatchProcs').value = (ord.autoStandDownProcesses || []).join(', ');
+  }
+
+  // Live tags
+  document.getElementById('liveNagTag').textContent = st.nagsSuppressed ? 'Live: Silenced' : 'Live: Active';
+  document.getElementById('liveTrayTag').textContent = st.securityTrayIconMuted ? 'Live: Muted' : 'Live: Visible';
+  document.getElementById('liveCloudTag').textContent = 'Live: ' + (st.cloudProtection === 0 ? 'OFF' : st.cloudProtection);
+  document.getElementById('liveSamplesTag').textContent = 'Live: ' + (st.sampleSubmission === 2 ? 'Never (2)' : st.sampleSubmission);
+  document.getElementById('liveRtpTag').textContent = 'Live: ' + (st.realtimeProtection ? 'ON' : 'OFF');
+  document.getElementById('liveBmTag').textContent = 'Live: ' + (st.behaviorMonitoring ? 'ON' : 'OFF');
+  document.getElementById('liveIoavTag').textContent = 'Live: ' + (st.ioavProtection ? 'ON' : 'OFF');
+  document.getElementById('liveScriptTag').textContent = 'Live: ' + (st.scriptScanning ? 'ON' : 'OFF');
+  document.getElementById('liveNetTag').textContent = 'Live: ' + st.networkProtection;
+
+  // Telemetry KV
+  document.getElementById('kvTamper').textContent = st.tamperProtectionActive
+    ? `ON (0x${st.tamperProtectionRaw.toString(16)})`
+    : `OFF (0x${st.tamperProtectionRaw.toString(16)})`;
+  document.getElementById('kvService').textContent = st.serviceRunning ? 'Running (Active)' : 'Stopped';
+  document.getElementById('kvPlatform').textContent = st.platformVersion || 'Built-in';
+  document.getElementById('kvSig').textContent = st.signatureVersion || '—';
+  document.getElementById('cfgPathLabel').textContent = 'Orders file: ' + (data.configPath || '');
+
+  // Audit Log
+  const auditEl = document.getElementById('auditList');
+  auditEl.innerHTML = '';
+  (data.auditLog || []).forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'audit-item';
+    const ts = new Date(entry.timestamp).toLocaleTimeString();
+    row.innerHTML = `<span class="ts">[${ts}]</span><span class="cat">${entry.category}</span>${entry.message}`;
+    auditEl.appendChild(row);
+  });
+}
+
+async function saveOrdersFromUI() {
+  if (!currentState) return;
+  const watchRaw = document.getElementById('txtWatchProcs').value;
+  const watchList = watchRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+  const orders = {
+    ...currentState.orders,
+    presetName: 'custom',
+    elected: true,
+    enforceLoop: document.getElementById('chkEnforceLoop').checked,
+    suppressAllNags: document.getElementById('chkSuppressAllNags').checked,
+    suppressEnhancedNags: document.getElementById('chkSuppressAllNags').checked,
+    muteWindowsSecSystray: document.getElementById('chkMuteSystray').checked,
+    cloudProtection: parseInt(document.getElementById('selCloud').value, 10),
+    sampleSubmission: parseInt(document.getElementById('selSamples').value, 10),
+    realtimeProtection: document.getElementById('chkRealtime').checked,
+    behaviorMonitoring: document.getElementById('chkBehavior').checked,
+    ioavProtection: document.getElementById('chkIOAV').checked,
+    scriptScanning: document.getElementById('chkScript').checked,
+    networkProtection: parseInt(document.getElementById('selNetwork').value, 10),
+    autoStandDownProcesses: watchList,
+  };
+
+  const res = await fetch('/api/orders', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(orders)
+  });
+  const out = await res.json();
+  showToast(out.message || 'Standing Orders updated');
+  fetchState();
+}
+
+async function applyPreset(id) {
+  const res = await fetch('/api/preset?id=' + encodeURIComponent(id), { method: 'POST' });
+  const out = await res.json();
+  showToast(out.message || 'Preset applied');
+  fetchState();
+}
+
+async function standDown(minutes) {
+  const res = await fetch('/api/standdown?minutes=' + minutes, { method: 'POST' });
+  const out = await res.json();
+  showToast(out.message || 'Updated Stand-Down state');
+  fetchState();
+}
+
+async function enforceNow() {
+  const res = await fetch('/api/enforce', { method: 'POST' });
+  const out = await res.json();
+  showToast(out.message || 'Standing Orders enforced');
+  fetchState();
+}
+
+async function elevateApp() {
+  const res = await fetch('/api/elevate', { method: 'POST' });
+  const out = await res.json();
+  showToast(out.message || 'Launching Administrator prompt...');
+}
+
+async function apiCall(path) {
+  showToast('Working...');
+  const res = await fetch(path, { method: 'POST' });
+  const out = await res.json();
+  showToast(out.message || 'Done');
+  fetchState();
+}
+
+fetchState();
+setInterval(fetchState, 3000);
+</script>
+</body>
+</html>
