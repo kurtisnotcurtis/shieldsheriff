@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShieldSheriff — Nag-Free Granular Control for Windows Defender</title>
+  <meta name="description" content="Put Windows 11 Defender under your command. Turn off Cloud-delivered protection, Automatic sample submission, or Real-Time scanning permanently without Windows Security nagging.">
+  <meta name="keywords" content="ShieldSheriff, stop Windows Defender notifications, disable cloud delivered protection nag, disable automatic sample submission Windows 11, Defender Control alternative, ConfigureDefender, DefenderUI">
+  <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ShieldSheriff",
+    "operatingSystem": "Windows 10, Windows 11",
+    "applicationCategory": "SecurityApplication",
+    "description": "User-elected governor for Windows Defender that locks granular engine settings, disables Cloud and Sample Submission telemetry permanently, pauses scanning during compiler builds, and silences Windows Security nags.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container navbar-inner">
+      <a href="#" class="nav-brand">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="30" fill="#0F172A" stroke="#B47309" stroke-width="2.5"/>
+          <polygon points="32,7 38.5,20.5 53.5,19.5 45,32 53.5,44.5 38.5,43.5 32,57 25.5,43.5 10.5,44.5 19,32 10.5,19.5 25.5,20.5" fill="#FACC15" stroke="#B47309" stroke-width="1.8"/>
+          <circle cx="32" cy="6" r="2.7" fill="#FACC15"/>
+          <circle cx="54.5" cy="19" r="2.7" fill="#FACC15"/>
+          <circle cx="54.5" cy="45" r="2.7" fill="#FACC15"/>
+          <circle cx="32" cy="58" r="2.7" fill="#FACC15"/>
+          <circle cx="9.5" cy="45" r="2.7" fill="#FACC15"/>
+          <circle cx="9.5" cy="19" r="2.7" fill="#FACC15"/>
+          <circle cx="32" cy="32" r="7.5" fill="#0F172A" stroke="#B47309" stroke-width="2"/>
+          <circle cx="32" cy="32" r="3.2" fill="#FACC15"/>
+        </svg>
+        ShieldSheriff
+      </a>
+      <div class="nav-links">
+        <a href="#comparison">Compare</a>
+        <a href="#architecture">ShieldSheriff vs. Others</a>
+        <a href="#cli">Get Started</a>
+      </div>
+      <a href="#cli" class="btn btn-primary">Get Started</a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebrow">&#9733; Windows 11 Defender Governor</div>
+        <h1>Put Windows Defender <span>Under Your Command.</span></h1>
+        <p class="hero-lead">
+          Keep the local protection you want. Turn off <strong>Cloud Protection</strong>, <strong>Sample Submission</strong>, or <strong>Real-Time Scanning</strong> permanently—with zero Windows Security nags and zero update resets.
+        </p>
+        <div class="hero-cta">
+          <a href="#cli" class="btn btn-primary">Get Started</a>
+          <a href="#comparison" class="btn">Compare Tools</a>
+        </div>
+        <div class="hero-badges">
+          <span>&#10003; Single ~5 MB Binary</span>
+          <span>&#10003; Zero Kernel Exploits</span>
+          <span>&#10003; Auto-Pause on Builds</span>
+        </div>
+      </div>
+
+      <!-- Interactive Standing Orders Simulator -->
+      <div class="sim-window">
+        <div class="sim-titlebar">
+          <div class="sim-title-left">
+            <span style="color: var(--gold);">&#9733;</span> Standing Orders Preview
+          </div>
+          <span id="simBadge" class="status-chip chip-gold">&#9733; KEEPING THE PEACE</span>
+        </div>
+        <div class="sim-body">
+          <div class="sim-preset-tabs">
+            <button class="sim-tab active" data-preset="quiet-guardian" onclick="selectPreset('quiet-guardian', this)">
+              Quiet Guardian
+              <small>Local ON &bull; Cloud OFF &bull; No Nags</small>
+            </button>
+            <button class="sim-tab" data-preset="dev-workstation" onclick="selectPreset('dev-workstation', this)">
+              Developer Workstation
+              <small>Auto-Pause on cargo / msbuild</small>
+            </button>
+            <button class="sim-tab" data-preset="on-demand-only" onclick="selectPreset('on-demand-only', this)">
+              On-Demand Deputy
+              <small>Real-Time OFF &bull; CLI Scans ON</small>
+            </button>
+            <button class="sim-tab" data-preset="full-shield" onclick="selectPreset('full-shield', this)">
+              Full Shield (Nag-Free)
+              <small>Local + Cloud ON &bull; No Uploads</small>
+            </button>
+          </div>
+
+          <div class="sim-rows">
+            <div class="sim-row">
+              <span>Real-Time Protection</span>
+              <span id="simRtp" class="status-chip chip-on">ON (Locked)</span>
+            </div>
+            <div class="sim-row">
+              <span>Behavior &amp; Script Hooks</span>
+              <span id="simBm" class="status-chip chip-on">ON (Locked)</span>
+            </div>
+            <div class="sim-row">
+              <span>Cloud Protection (MAPS)</span>
+              <span id="simCloud" class="status-chip chip-off">OFF — SpynetReporting=0</span>
+            </div>
+            <div class="sim-row">
+              <span>Sample Submission</span>
+              <span id="simSamples" class="status-chip chip-off">NEVER — SubmitSamplesConsent=2</span>
+            </div>
+            <div class="sim-row">
+              <span>Security Center Nags</span>
+              <span id="simNags" class="status-chip chip-gold">SILENCED (DisableNotifications=1)</span>
+            </div>
+            <div class="sim-row">
+              <span>Build Watcher / CLI Scans</span>
+              <span id="simWatch" class="status-chip chip-off">Manual / Timer Only</span>
+            </div>
+          </div>
+
+          <div class="sim-tray-preview">
+            <span style="color: var(--gold); font-weight: 700;">&#9733; Tray:</span>
+            <code id="simTrayText" style="color: var(--text-secondary);">ShieldSheriff ★ Keeping the Peace | Real-Time: ON | Cloud/Samples: OFF</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Comparison Section -->
+  <section id="comparison">
+    <div class="container">
+      <div class="section-header">
+        <div class="eyebrow">Feature Comparison</div>
+        <h2>How ShieldSheriff Compares</h2>
+        <p>
+          Filter by use case or compare capabilities side-by-side.
+        </p>
+      </div>
+
+      <!-- Interactive Scenario Filter -->
+      <div class="scenario-bar">
+        <button class="scenario-btn active" data-scenario="all" onclick="selectScenario('all', this)">All Capabilities</button>
+        <button class="scenario-btn" data-scenario="privacy" onclick="selectScenario('privacy', this)">Privacy &amp; Zero Nags</button>
+        <button class="scenario-btn" data-scenario="dev" onclick="selectScenario('dev', this)">Developer Build Speed</button>
+        <button class="scenario-btn" data-scenario="ondemand" onclick="selectScenario('ondemand', this)">On-Demand Only</button>
+        <button class="scenario-btn" data-scenario="clean" onclick="selectScenario('clean', this)">Zero Exploits</button>
+      </div>
+
+      <div id="scenarioVerdict" class="scenario-verdict"></div>
+
+      <!-- Comparison Table -->
+      <div class="table-wrap">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th style="width: 24%;">Capability</th>
+              <th class="col-sheriff" style="width: 22%;">&#9733; ShieldSheriff</th>
+              <th style="width: 18%;">
+                <a href="https://www.sordum.org/9480/defender-control-v2-1/" target="_blank" rel="noopener">Defender Control &#8599;</a>
+              </th>
+              <th style="width: 18%;">
+                <a href="https://github.com/AndyFul/ConfigureDefender" target="_blank" rel="noopener">ConfigureDefender &#8599;</a>
+              </th>
+              <th style="width: 18%;">
+                <a href="https://www.defenderui.com/" target="_blank" rel="noopener">DefenderUI &#8599;</a>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr id="row-philosophy">
+              <td><strong>Primary Goal</strong></td>
+              <td class="col-sheriff"><strong>Granular Governor</strong><small>Keep local protection, drop telemetry &amp; nags</small></td>
+              <td><strong>Kill-Switch</strong><small>100% ON or 100% DEAD</small></td>
+              <td><strong>Hardening Table</strong><small>Cranks cloud &amp; ASR rules up</small></td>
+              <td><strong>Full AV Suite</strong><small>Adds cloud whitelisting overlay</small></td>
+            </tr>
+            <tr id="row-cloud-off">
+              <td><strong>Real-Time ON + Cloud &amp; Samples OFF (Nag-Free)</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Default Preset</span></td>
+              <td><span class="badge-no">&#10007; No</span></td>
+              <td><span class="badge-warn">&#9888; Still Nags</span></td>
+              <td><span class="badge-no">&#10007; Cloud-First</span></td>
+            </tr>
+            <tr id="row-nags">
+              <td><strong>Silences Windows 11 Toast &amp; Tray Nags</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Yes</span></td>
+              <td><span class="badge-warn">&#9888; Kills Service</span></td>
+              <td><span class="badge-no">&#10007; No</span></td>
+              <td><span class="badge-no">&#10007; No</span></td>
+            </tr>
+            <tr id="row-ondemand">
+              <td><strong>Manual Scans Work When Real-Time Is OFF</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Yes (<code>MpCmdRun</code>)</span></td>
+              <td><span class="badge-no">&#10007; Service Dead</span></td>
+              <td><span class="badge-no">&#10007; Resets on Reboot</span></td>
+              <td><span class="badge-warn">&#9888; Timed Only</span></td>
+            </tr>
+            <tr id="row-process-watch">
+              <td><strong>Auto-Pause During Builds (<code>cargo</code> / <code>msbuild</code>)</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Built-In</span></td>
+              <td><span class="badge-no">&#10007; No</span></td>
+              <td><span class="badge-no">&#10007; No</span></td>
+              <td><span class="badge-no">&#10007; No</span></td>
+            </tr>
+            <tr id="row-subengines">
+              <td><strong>Granular Sub-Engine Toggles</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Tray + UI + CLI</span></td>
+              <td><span class="badge-no">&#10007; None</span></td>
+              <td><span class="badge-yes">&#10003; GUI Only</span></td>
+              <td><span class="badge-yes">&#10003; GUI Only</span></td>
+            </tr>
+            <tr id="row-drift">
+              <td><strong>Auto-Heals Windows Update Resets</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; 5s Drift Guard</span></td>
+              <td><span class="badge-no">&#10007; One-Shot</span></td>
+              <td><span class="badge-no">&#10007; One-Shot</span></td>
+              <td><span class="badge-yes">&#10003; Resident</span></td>
+            </tr>
+            <tr id="row-wsman">
+              <td><strong>Works When WinRM / WSMan Is Disabled</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Yes (DCOM)</span></td>
+              <td><span class="badge-yes">&#10003; Yes</span></td>
+              <td><span class="badge-no">&#10007; Fails</span></td>
+              <td><span class="badge-yes">&#10003; Yes</span></td>
+            </tr>
+            <tr id="row-av-clean">
+              <td><strong>Clean Binary (No AV HackTool Detections)</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Clean Policy/WMI</span></td>
+              <td><span class="badge-no">&#10007; Flagged by AVs</span></td>
+              <td><span class="badge-yes">&#10003; Clean</span></td>
+              <td><span class="badge-yes">&#10003; Clean</span></td>
+            </tr>
+            <tr id="row-footprint">
+              <td><strong>Footprint &amp; Scriptable CLI</strong></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; ~5 MB + Full CLI</span></td>
+              <td><span class="badge-no">&#10007; GUI Only</span></td>
+              <td><span class="badge-no">&#10007; GUI Only</span></td>
+              <td><span class="badge-no">&#10007; Heavy Suite</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Visual 3-Card Competitor Breakdown -->
+      <div class="competitor-cards">
+        <!-- Card 1: Defender Control -->
+        <div class="comp-card">
+          <div>
+            <div class="comp-card-header">
+              <h3>Defender Control</h3>
+              <a href="https://www.sordum.org/9480/defender-control-v2-1/" target="_blank" rel="noopener">Website &#8599;</a>
+            </div>
+            <div class="comp-graphic">
+              <!-- Visual: Binary Sledgehammer Switch vs Granular Sliders -->
+              <svg viewBox="0 0 260 76" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="12" width="104" height="52" rx="8" fill="#18121E" stroke="#F87171" stroke-width="1.5"/>
+                <text x="60" y="32" fill="#F87171" font-size="11" font-weight="700" text-anchor="middle">ALL OR NOTHING</text>
+                <text x="60" y="50" fill="#94A3B8" font-size="10" text-anchor="middle">Kills WinDefend</text>
+                <text x="130" y="42" fill="#64748B" font-size="12" font-weight="700" text-anchor="middle">vs</text>
+                <rect x="148" y="12" width="104" height="52" rx="8" fill="#111C2D" stroke="#FACC15" stroke-width="1.5"/>
+                <circle cx="172" cy="28" r="5" fill="#22C55E"/><line x1="184" y1="28" x2="236" y2="28" stroke="#22C55E" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="220" cy="40" r="5" fill="#94A3B8"/><line x1="164" y1="40" x2="212" y2="40" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="172" cy="52" r="5" fill="#FACC15"/><line x1="184" y1="52" x2="236" y2="52" stroke="#FACC15" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <ul class="comp-bullets">
+              <li><span class="badge-no">&#10007;</span> No granular toggles (only 100% ON or DEAD)</li>
+              <li><span class="badge-no">&#10007;</span> Breaks manual scans &amp; signature updates</li>
+              <li><span class="badge-no">&#10007;</span> Flagged by AVs as <code>HackTool:Win32/Defnot</code></li>
+            </ul>
+          </div>
+          <div class="diff-box">
+            <strong>ShieldSheriff:</strong> Keeps Defender alive under your rules—without service-killing exploits.
+          </div>
+        </div>
+
+        <!-- Card 2: ConfigureDefender -->
+        <div class="comp-card">
+          <div>
+            <div class="comp-card-header">
+              <h3>ConfigureDefender</h3>
+              <a href="https://github.com/AndyFul/ConfigureDefender" target="_blank" rel="noopener">GitHub &#8599;</a>
+            </div>
+            <div class="comp-graphic">
+              <!-- Visual: Max Cloud Dial + Nag Bell vs Locked Quiet Shield -->
+              <svg viewBox="0 0 260 76" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="12" width="104" height="52" rx="8" fill="#171E2E" stroke="#FB923C" stroke-width="1.5"/>
+                <text x="60" y="32" fill="#FB923C" font-size="11" font-weight="700" text-anchor="middle">MAX CLOUD DIAL</text>
+                <text x="60" y="50" fill="#94A3B8" font-size="10" text-anchor="middle">Static &bull; Still Nags</text>
+                <text x="130" y="42" fill="#64748B" font-size="12" font-weight="700" text-anchor="middle">vs</text>
+                <rect x="148" y="12" width="104" height="52" rx="8" fill="#111C2D" stroke="#FACC15" stroke-width="1.5"/>
+                <text x="200" y="32" fill="#FACC15" font-size="11" font-weight="700" text-anchor="middle">&#9733; DRIFT-PROOF</text>
+                <text x="200" y="50" fill="#22C55E" font-size="10" font-weight="600" text-anchor="middle">Cloud OFF &bull; 0 Nags</text>
+              </svg>
+            </div>
+            <ul class="comp-bullets">
+              <li><span class="badge-warn">&#9888;</span> Built to turn <em>more</em> Cloud &amp; ASR rules ON</li>
+              <li><span class="badge-no">&#10007;</span> Doesn't silence Security Center toast nags</li>
+              <li><span class="badge-no">&#10007;</span> One-shot registry edit; no build watcher</li>
+            </ul>
+          </div>
+          <div class="diff-box">
+            <strong>ShieldSheriff:</strong> Privacy-first, silences nags, heals update drift, and auto-pauses for builds.
+          </div>
+        </div>
+
+        <!-- Card 3: DefenderUI -->
+        <div class="comp-card">
+          <div>
+            <div class="comp-card-header">
+              <h3>DefenderUI</h3>
+              <a href="https://www.defenderui.com/" target="_blank" rel="noopener">Website &#8599;</a>
+            </div>
+            <div class="comp-graphic">
+              <!-- Visual: Heavy Cloud Stack vs Featherweight Single Binary -->
+              <svg viewBox="0 0 260 76" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="12" width="104" height="52" rx="8" fill="#171E2E" stroke="#38BDF8" stroke-width="1.5"/>
+                <text x="60" y="32" fill="#38BDF8" font-size="11" font-weight="700" text-anchor="middle">CLOUD OVERLAY</text>
+                <text x="60" y="50" fill="#94A3B8" font-size="10" text-anchor="middle">Heavy Suite Agent</text>
+                <text x="130" y="42" fill="#64748B" font-size="12" font-weight="700" text-anchor="middle">vs</text>
+                <rect x="148" y="12" width="104" height="52" rx="8" fill="#111C2D" stroke="#FACC15" stroke-width="1.5"/>
+                <text x="200" y="32" fill="#FACC15" font-size="11" font-weight="700" text-anchor="middle">SINGLE BINARY</text>
+                <text x="200" y="50" fill="#22C55E" font-size="10" font-weight="600" text-anchor="middle">Zero Cloud Bloat</text>
+              </svg>
+            </div>
+            <ul class="comp-bullets">
+              <li><span class="badge-no">&#10007;</span> Heavy closed-source resident suite</li>
+              <li><span class="badge-no">&#10007;</span> Pushes proprietary cloud whitelisting</li>
+              <li><span class="badge-no">&#10007;</span> Treats disabled telemetry as a warning</li>
+            </ul>
+          </div>
+          <div class="diff-box">
+            <strong>ShieldSheriff:</strong> Open-source ~5 MB binary with zero third-party cloud telemetry.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ShieldSheriff vs. Others (Visual Architecture Section) -->
+  <section id="architecture">
+    <div class="container">
+      <div class="section-header">
+        <div class="eyebrow">Under the Hood</div>
+        <h2>ShieldSheriff vs. Others</h2>
+        <p>
+          How ShieldSheriff governs Windows 11 cleanly compared to common workarounds.
+        </p>
+      </div>
+
+      <div class="arch-grid">
+        <!-- Left: ShieldSheriff -->
+        <div class="arch-panel good">
+          <h3 style="color: var(--gold);">&#9733; ShieldSheriff</h3>
+          <div class="visual-steps">
+            <div class="v-step">
+              <div class="v-icon">&#128275;</div>
+              <div class="v-text">
+                <strong>1-Time Tamper Handoff</strong>
+                <span>Toggle Tamper Protection off once in Windows Security so Windows honors local policy locks.</span>
+              </div>
+            </div>
+            <div class="v-step">
+              <div class="v-icon">&#9881;&#65039;</div>
+              <div class="v-text">
+                <strong>Policy Locks + Live DCOM Sync</strong>
+                <span>Locks <code>HKLM\SOFTWARE\Policies</code> AND updates <code>MsMpEng.exe</code> in memory via DCOM WMI.</span>
+              </div>
+            </div>
+            <div class="v-step">
+              <div class="v-icon">&#128263;</div>
+              <div class="v-text">
+                <strong>Native Nag Suppression</strong>
+                <span>Uses official Windows notification policies (<code>DisableNotifications=1</code>) to silence warnings.</span>
+              </div>
+            </div>
+            <div class="v-step">
+              <div class="v-icon">&#9889;</div>
+              <div class="v-text">
+                <strong>5s Drift Guard &amp; Build Watcher</strong>
+                <span>Reverts update resets automatically and pauses scanning while compilers run.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Other Approaches -->
+        <div class="arch-panel">
+          <h3 style="color: var(--text-secondary);">&#9888; Other Approaches</h3>
+          <div class="visual-steps">
+            <div class="v-step">
+              <div class="v-icon">&#128296;</div>
+              <div class="v-text">
+                <strong>Service Killers (<code>TrustedInstaller</code> Hacks)</strong>
+                <span>Guts <code>WinDefend</code> completely—breaking manual scans and triggering AV malware alerts.</span>
+              </div>
+            </div>
+            <div class="v-step">
+              <div class="v-icon">&#127917;</div>
+              <div class="v-text">
+                <strong>Fake 3rd-Party AV Registration (WSC Spoofing)</strong>
+                <span>Registering a dummy AV causes Defender to enter Passive Mode and <strong>shut down its own Real-Time engine</strong>.</span>
+              </div>
+            </div>
+            <div class="v-step">
+              <div class="v-icon">&#128221;</div>
+              <div class="v-text">
+                <strong>One-Shot Registry Tweakers</strong>
+                <span>Leaves Windows Security free to nag when Cloud/Samples are off, and resets after Windows Updates.</span>
+              </div>
+            </div>
+            <div class="v-step">
+              <div class="v-icon">&#9729;&#65039;</div>
+              <div class="v-text">
+                <strong>Proprietary Cloud Wrappers</strong>
+                <span>Adds another resident agent and flags disabled cloud telemetry as an error.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get Started / CLI Section -->
+  <section id="cli">
+    <div class="container">
+      <div class="section-header">
+        <div class="eyebrow">Quick Start</div>
+        <h2>Get Started in 30 Seconds</h2>
+        <p>
+          Use the dark-mode <strong>Command Center UI</strong>, the <strong>System Tray Star</strong>, or the PowerShell CLI.
+        </p>
+      </div>
+
+      <div class="cli-box">
+<pre><span class="cli-comment"># 1. Inspect live Defender status, Tamper Protection, and drift</span>
+<span class="cli-cmd">.\shieldsheriff.exe</span> <span class="cli-arg">status</span>
+
+<span class="cli-comment"># 2. Apply the default "Quiet Guardian" preset (prompts for Admin UAC)</span>
+<span class="cli-comment">#    Real-Time ON &bull; Cloud OFF &bull; Sample Uploads OFF &bull; All Nags Silenced</span>
+<span class="cli-cmd">.\shieldsheriff.exe</span> <span class="cli-arg">elect --elevate</span>
+
+<span class="cli-comment"># 3. Customize individual toggles from the CLI</span>
+<span class="cli-cmd">.\shieldsheriff.exe</span> <span class="cli-arg">order realtime=on behavior=off script=off cloud=off samples=never nags=off</span>
+
+<span class="cli-comment"># 4. Auto-pause Real-Time Protection while compilers run</span>
+<span class="cli-cmd">.\shieldsheriff.exe</span> <span class="cli-arg">order watch=cargo.exe,rustc.exe,msbuild.exe,link.exe</span>
+
+<span class="cli-comment"># 5. Install the 24/7 background SYSTEM service</span>
+<span class="cli-cmd">.\shieldsheriff.exe</span> <span class="cli-arg">service install</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>&#9733; <strong>ShieldSheriff</strong> — Granular, Nag-Free Control for Windows Defender. Released under the MIT License. Not affiliated with Microsoft Corporation.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
