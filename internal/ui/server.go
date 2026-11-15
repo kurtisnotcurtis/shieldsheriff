@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"shieldsheriff/internal/defender"
@@ -22,9 +24,11 @@ var dashboardHTML []byte
 
 // Server hosts the local ShieldSheriff Command Center UI on 127.0.0.1.
 type Server struct {
-	gov  *sheriff.Governor
-	addr string
-	url  string
+	gov      *sheriff.Governor
+	addr     string
+	url      string
+	openMu   sync.Mutex
+	lastOpen time.Time
 }
 
 // StartServer starts the local loopback Command Center HTTP server.
@@ -60,11 +64,13 @@ func NewServer(gov *sheriff.Governor) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleIndex)
+	mux.HandleFunc("/assets/presets/", s.handlePresetImage)
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/orders", s.handleOrders)
 	mux.HandleFunc("/api/preset", s.handlePreset)
 	mux.HandleFunc("/api/standdown", s.handleStandDown)
 	mux.HandleFunc("/api/enforce", s.handleEnforce)
+	mux.HandleFunc("/api/focus", s.handleFocus)
 	mux.HandleFunc("/api/elevate", s.handleElevate)
 	mux.HandleFunc("/api/open-winsec", s.handleOpenWinSec)
 	mux.HandleFunc("/api/quick-scan", s.handleQuickScan)
@@ -80,15 +86,32 @@ func (s *Server) URL() string {
 }
 
 // OpenWindow opens the Command Center in a native-feeling chromeless Edge/Chrome app window
-// (falling back to the default browser).
+// (falling back to the default browser), or focuses the existing window if one is already open.
 func (s *Server) OpenWindow() {
+	s.openMu.Lock()
+	defer s.openMu.Unlock()
+
+	if focusExistingCommandCenterWindow() {
+		return
+	}
+	if !s.lastOpen.IsZero() && time.Since(s.lastOpen) < 1500*time.Millisecond {
+		return
+	}
+	s.lastOpen = time.Now()
+
+	args := []string{"--app=" + s.url, "--window-size=840,750"}
+	if cacheDir, err := os.UserCacheDir(); err == nil && cacheDir != "" {
+		profileDir := filepath.Join(cacheDir, "ShieldSheriff", "edge-app")
+		args = append(args, "--user-data-dir="+profileDir)
+	}
+
 	edgePaths := []string{
 		`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`,
 		`C:\Program Files\Microsoft\Edge\Application\msedge.exe`,
 	}
 	for _, p := range edgePaths {
 		if _, err := os.Stat(p); err == nil {
-			cmd := exec.Command(p, "--app="+s.url, "--window-size=1160,820")
+			cmd := exec.Command(p, args...)
 			if err := cmd.Start(); err == nil {
 				return
 			}
@@ -105,6 +128,19 @@ func writeJSON(w http.ResponseWriter, v any) {
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(dashboardHTML)
+}
+
+func (s *Server) handlePresetImage(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/assets/presets/")
+	id = strings.TrimSuffix(id, ".jpg")
+	b, ok := PresetImageBytes(id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(b)
 }
 
 func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
@@ -181,8 +217,13 @@ func (s *Server) handleEnforce(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": res.Success, "message": msg, "result": res})
 }
 
+func (s *Server) handleFocus(w http.ResponseWriter, r *http.Request) {
+	go s.OpenWindow()
+	writeJSON(w, map[string]any{"ok": true, "message": "Focused Command Center"})
+}
+
 func (s *Server) handleElevate(w http.ResponseWriter, r *http.Request) {
-	err := defender.RelaunchElevated(nil)
+	err := defender.RelaunchElevated([]string{"ui", "--replace"})
 	if err != nil {
 		writeJSON(w, map[string]any{"ok": false, "message": "Elevation cancelled or failed: " + err.Error()})
 		return

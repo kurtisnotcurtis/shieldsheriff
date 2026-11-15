@@ -432,7 +432,7 @@ func (t *AppTray) handleCommand(cmd uint32) {
 			go t.openDashboard()
 		}
 	case cmdElevateNow:
-		if err := defender.RelaunchElevated(nil); err == nil {
+		if err := defender.RelaunchElevated([]string{"ui", "--replace"}); err == nil {
 			procPostQuitMessage.Call(0)
 		}
 

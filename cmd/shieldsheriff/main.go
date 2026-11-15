@@ -18,16 +18,17 @@ import (
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		runInteractive(true)
+		runInteractive(true, false)
 		return
 	}
 
 	cmd := strings.ToLower(args[0])
+	replace := hasFlag(args[1:], "--replace")
 	switch cmd {
 	case "tray", "--minimized":
-		runInteractive(false)
+		runInteractive(false, replace)
 	case "ui", "dashboard":
-		runInteractive(true)
+		runInteractive(true, replace)
 	case "status":
 		runStatus(args[1:])
 	case "elect", "enforce":
@@ -55,7 +56,48 @@ func main() {
 	}
 }
 
-func runInteractive(openWindowOnStart bool) {
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if strings.EqualFold(a, flag) {
+			return true
+		}
+	}
+	return false
+}
+
+func runInteractive(openWindowOnStart bool, replaceExisting bool) {
+	const instanceMutexName = `Local\ShieldSheriffCommandCenterInstance`
+	const preferredPort = 38419
+
+	var (
+		release        func()
+		alreadyRunning bool
+		err            error
+	)
+	attempts := 1
+	if replaceExisting {
+		attempts = 20
+	}
+	for i := 0; i < attempts; i++ {
+		release, alreadyRunning, err = acquireSingleInstance(instanceMutexName)
+		if err != nil || !alreadyRunning {
+			break
+		}
+		if replaceExisting && i < attempts-1 {
+			time.Sleep(150 * time.Millisecond)
+		}
+	}
+	if err == nil && alreadyRunning {
+		if openWindowOnStart {
+			_ = focusExistingInstance(preferredPort)
+		}
+		fmt.Println("★ ShieldSheriff Command Center is already running.")
+		return
+	}
+	if release != nil {
+		defer release()
+	}
+
 	gov := sheriff.NewGovernor()
 	st, _, _, _, _ := gov.Snapshot()
 	if st.IsElevated && !st.TamperProtectionActive {
@@ -64,7 +106,7 @@ func runInteractive(openWindowOnStart bool) {
 	gov.StartLoop()
 	defer gov.StopLoop()
 
-	srv, err := ui.StartServer(gov, 38419)
+	srv, err := ui.StartServer(gov, preferredPort)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start Command Center UI server: %v\n", err)
 		os.Exit(1)

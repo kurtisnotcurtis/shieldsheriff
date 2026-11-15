@@ -49,4 +49,21 @@ func TestServerEndpoints(t *testing.T) {
 	req4 := httptest.NewRequest(http.MethodPost, "/api/standdown?minutes=0", nil)
 	rec4 := httptest.NewRecorder()
 	h.ServeHTTP(rec4, req4)
+
+	// 5. Embedded Sheriff preset artwork
+	for _, id := range []string{"quiet-guardian", "dev-workstation", "on-demand-only", "full-shield-no-nag"} {
+		reqImg := httptest.NewRequest(http.MethodGet, "/assets/presets/"+id+".jpg", nil)
+		recImg := httptest.NewRecorder()
+		h.ServeHTTP(recImg, reqImg)
+		if recImg.Code != http.StatusOK || recImg.Header().Get("Content-Type") != "image/jpeg" || recImg.Body.Len() < 1000 {
+			t.Fatalf("expected valid JPEG for preset %s, got code=%d len=%d", id, recImg.Code, recImg.Body.Len())
+		}
+	}
+
+	reqMissing := httptest.NewRequest(http.MethodGet, "/assets/presets/unknown.jpg", nil)
+	recMissing := httptest.NewRecorder()
+	h.ServeHTTP(recMissing, reqMissing)
+	if recMissing.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown preset image, got %d", recMissing.Code)
+	}
 }

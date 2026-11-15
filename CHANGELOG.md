@@ -17,6 +17,20 @@ Machine-readable release and platform compatibility metadata is also maintained 
 
 ---
 
+## [2026.11.2] — "Peacekeeper" (2026-11-15)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
+
+### Changed
+- **Compact Tabbed Command Center UI (`internal/ui/dashboard.html`, `internal/ui/server.go`):** Redesigned the Command Center into a compact two-tab layout (`Sheriff Presets & Controls` and `Operations, Stand-Down & Audit`) sized cleanly to `840x750` in an isolated Edge app profile (`--user-data-dir`) with zero horizontal overflow or hover jitter.
+- **Inline SVG Sheriff Preset Cards & Hover Diff Preview:** Added custom vector Sheriff illustrations ordered left-to-right (`On-Demand Deputy` → `Developer Workstation` → `Quiet Guardian` → `Full Shield`), paired with live hover-diff preview highlights and granular override controls.
+
+### Added
+- **Single-Instance Process & Window Locking (`cmd/shieldsheriff/instance.go`, `internal/ui/window.go`):** Enforced single interactive instance locking via a named Windows mutex (`Local\ShieldSheriffCommandCenterInstance`), `/api/focus` handoff, `--replace` elevation handoff, and Win32 `EnumWindows` / `SetForegroundWindow` deduplication in `OpenWindow()`.
+
+---
+
 ## [2026.11.1] — "Peacekeeper" (2026-11-15)
 
 * **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
