@@ -2,6 +2,8 @@
 
 **Put Windows Defender Under Your Command — Nag-Free, Granular, Permanent Standing Orders for Windows 11.**
 
+> **Platform Support:** Windows 11 only.
+
 Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a solid antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags when you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**—and Windows Updates frequently flip your settings back on.
 
 Rather than registering as a fake third-party antivirus in Windows Security Center (which causes `MsMpEng.exe` to automatically disable its own real-time protection and requires an MVI ELAM kernel certificate), **ShieldSheriff** acts as your **user-elected governor**:
@@ -36,7 +38,7 @@ shieldsheriff/
 │   └── version/
 │       └── version.go              # CalVer (YYYY.0M.MICRO) release & Defender platform compatibility metadata
 ├── site/                           # Static marketing & comparison website (index.html, styles.css, app.js)
-├── CHANGELOG.md                    # CalVer release history & 24-month Windows Defender evolution log
+├── CHANGELOG.md                    # CalVer release history & Windows Defender evolution log
 ├── VERSION.json                    # Machine-readable CalVer metadata & tested Defender platform matrix
 ├── go.mod
 └── LICENSE
@@ -93,9 +95,9 @@ go build -o bin\shieldsheriff.exe ./cmd/shieldsheriff
 
 ## Versioning (`CalVer`) & Changelog
 
-ShieldSheriff uses **Calendar Versioning (`YYYY.0M.MICRO`)**—currently **`v2026.11.1` ("Peacekeeper")**—because Windows Defender (`MsMpEng.exe` / `WdFilter.sys`) and Windows Security Center (`SecurityHealthService.exe`) evolve on Microsoft's monthly Patch Tuesday and Windows 11 cumulative update schedule rather than static library SemVer contracts.
+ShieldSheriff uses **Calendar Versioning (`YYYY.0M.MICRO`)** because Windows Defender (`MsMpEng.exe` / `WdFilter.sys`) and Windows Security Center (`SecurityHealthService.exe`) evolve on Microsoft's monthly Patch Tuesday and Windows 11 cumulative update schedule rather than static library SemVer contracts.
 
-- See [`CHANGELOG.md`](CHANGELOG.md) for the full 24-month release history and Windows Defender platform changes.
+- See [`CHANGELOG.md`](CHANGELOG.md) for the full release history and Windows Defender platform changes.
 - See [`VERSION.json`](VERSION.json) for machine-readable release and compatibility metadata.
 
 ---
