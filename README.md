@@ -18,7 +18,9 @@ Rather than registering as a fake third-party antivirus in Windows Security Cent
 
 ```
 shieldsheriff/
-├── cmd/shieldsheriff/main.go       # CLI, System Tray, Command Center UI & Windows Service entry point
+├── cmd/shieldsheriff/
+│   ├── main.go                     # CLI, System Tray, Command Center UI & Windows Service entry point
+│   └── instance.go                 # Single-instance named mutex & Command Center focus handoff
 ├── internal/
 │   ├── defender/
 │   │   ├── state.go                # StandingOrders, DeputyStatus, StandDownState, and Presets
@@ -33,8 +35,9 @@ shieldsheriff/
 │   │   ├── icon.go                 # Procedural 32-bit ARGB 6-Pointed Sheriff Star HICON renderer
 │   │   └── systray.go              # Native Win32 Shell_NotifyIconW System Tray & popup menu
 │   ├── ui/
-│   │   ├── server.go               # Localhost (127.0.0.1) Command Center server & Edge App-mode window launcher
-│   │   └── dashboard.html          # Embedded dark-mode ShieldSheriff Command Center UI
+│   │   ├── server.go               # Localhost (127.0.0.1) Command Center server & isolated Edge App launcher
+│   │   ├── window.go               # Win32 EnumWindows / SetForegroundWindow deduplication
+│   │   └── dashboard.html          # Compact two-tab Command Center UI with SVG Sheriff preset cards & diff preview
 │   └── version/
 │       └── version.go              # CalVer (YYYY.0M.MICRO) release & Defender platform compatibility metadata
 ├── site/                           # Static marketing & comparison website (index.html, styles.css, app.js)
@@ -69,6 +72,8 @@ go build -o bin\shieldsheriff.exe ./cmd/shieldsheriff
 ```powershell
 .\bin\shieldsheriff.exe
 ```
+- **Sheriff Preset Cards + Granular Overrides:** Choose from 4 illustrated Sheriff presets (**On-Demand Deputy** → **Developer Workstation** → **Quiet Guardian** → **Full Shield**) with live hover-diff preview and per-setting overrides.
+- **Single-Instance Locking:** Relaunching focuses the existing Command Center window instead of opening duplicates.
 - **Gold Sheriff Star** in the system tray: In compliance & keeping the peace.
 - **Cyan Sheriff Star**: Deputy is temporarily standing down (paused by timer or watched build process).
 - **Amber Sheriff Star**: Drift detected or running unprivileged.
