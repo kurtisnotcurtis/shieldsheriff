@@ -1,0 +1,105 @@
+{
+  "version": "2026.11.1",
+  "scheme": "CalVer (YYYY.0M.MICRO)",
+  "codename": "Peacekeeper",
+  "releasedOn": "2026-11-15",
+  "timezone": "America/New_York",
+  "rationale": "Windows Defender (MsMpEng.exe / WdFilter.sys) and Windows Security Center (SecurityHealthService.exe) evolve on Microsoft's monthly Patch Tuesday and Windows 11 24H2/25H2 cumulative release cadence rather than traditional semantic API contracts. CalVer (YYYY.0M.MICRO) immediately communicates which Windows 11 cumulative update wave and Defender platform version a release targets.",
+  "compatibility": {
+    "windowsBuilds": [
+      "Windows 11 23H2 (22631)",
+      "Windows 11 24H2 (26100)",
+      "Windows 11 25H2 (26200)"
+    ],
+    "defenderPlatformBaseline": "4.18.26100.5",
+    "wmiNamespace": "ROOT\\Microsoft\\Windows\\Defender (MSFT_MpPreference via DCOM)",
+    "tamperProtectionBitmask": {
+      "disabled": ["0x0", "0x4"],
+      "enabled": ["0x1", "0x5"]
+    }
+  },
+  "releases": [
+    {
+      "version": "2026.11.1",
+      "tag": "v2026.11.1",
+      "codename": "Peacekeeper",
+      "date": "2026-11-15",
+      "windowsBaseline": "Windows 11 24H2 / 25H2 (26100.2314+)",
+      "defenderPlatform": "4.18.26100.5",
+      "summary": "Public release website, competitor comparison simulator, CalVer version metadata CLI/API, and November 2026 Defender platform verification."
+    },
+    {
+      "version": "2026.08.1",
+      "tag": "v2026.08.1",
+      "codename": "Command Center",
+      "date": "2026-08-23",
+      "windowsBaseline": "Windows 11 24H2 / 25H2 Preview (26100.1457+)",
+      "defenderPlatform": "4.18.26070.3",
+      "summary": "Embedded dark-mode localhost Command Center UI (127.0.0.1:38419) with chromeless Edge app window launcher, live telemetry cards, and interactive preset switching."
+    },
+    {
+      "version": "2026.04.1",
+      "tag": "v2026.04.1",
+      "codename": "Gold Star",
+      "date": "2026-04-26",
+      "windowsBaseline": "Windows 11 24H2 (26100.712)",
+      "defenderPlatform": "4.18.26030.2",
+      "summary": "Native Win32 system tray UI (Shell_NotifyIconW) with procedural 2x2-supersampled 32-bit ARGB 6-pointed Sheriff Star HICON renderer and quick context menus."
+    },
+    {
+      "version": "2025.12.1",
+      "tag": "v2025.12.1",
+      "codename": "Night Watch",
+      "date": "2025-12-21",
+      "windowsBaseline": "Windows 11 24H2 (26100.2605)",
+      "defenderPlatform": "4.18.25110.6",
+      "summary": "Native Win32 Service Control Manager (SCM) SYSTEM service dispatcher and persistent 5-second drift auto-healer against monthly Patch Tuesday policy resets."
+    },
+    {
+      "version": "2025.09.1",
+      "tag": "v2025.09.1",
+      "codename": "Stand-Down",
+      "date": "2025-09-21",
+      "windowsBaseline": "Windows 11 24H2 (26100.1742)",
+      "defenderPlatform": "4.18.25080.5",
+      "summary": "Timed Deputy Stand-Down and Win32 CreateToolhelp32Snapshot process watcher to automatically pause Real-Time Protection during cargo, rustc, msbuild, and link builds."
+    },
+    {
+      "version": "2025.06.2",
+      "tag": "v2025.06.2",
+      "tagType": "hotfix",
+      "codename": "DCOM Bridge Hotfix",
+      "date": "2025-06-15",
+      "windowsBaseline": "Windows 11 24H2 (26100.863)",
+      "defenderPlatform": "4.18.25050.5",
+      "summary": "Switched WMI MSFT_MpPreference synchronization to explicit DCOM CimSession Option so live engine sync succeeds on machines with WinRM/WSMan disabled, plus 0x4/0x5 Tamper Protection bitmask detection."
+    },
+    {
+      "version": "2025.06.1",
+      "tag": "v2025.06.1",
+      "codename": "Direct Sync",
+      "date": "2025-06-08",
+      "windowsBaseline": "Windows 11 24H2 (26100.863)",
+      "defenderPlatform": "4.18.25050.5",
+      "summary": "Added live WMI MSFT_MpPreference synchronization alongside HKLM policy locks after Defender platform 4.18.25050 stopped hot-reloading registry-only edits."
+    },
+    {
+      "version": "2025.02.1",
+      "tag": "v2025.02.1",
+      "codename": "Silent Star",
+      "date": "2025-02-16",
+      "windowsBaseline": "Windows 11 24H2 (26100.3194)",
+      "defenderPlatform": "4.18.25010.11",
+      "summary": "Comprehensive Windows 11 24H2 SecurityHealthService toast & tray nag suppression (DisableNotifications, DisableEnhancedNotifications, Notification_Suppress, and reversible SecurityHealthSystray backup/mute)."
+    },
+    {
+      "version": "2024.12.1",
+      "tag": "v2024.12.1",
+      "codename": "First Badge",
+      "date": "2024-12-15",
+      "windowsBaseline": "Windows 11 23H2 / 24H2 (26100.2314)",
+      "defenderPlatform": "4.18.24090.11",
+      "summary": "Initial public CLI release with native Win32 Registry inspection, UAC self-elevation, MpCmdRun on-demand scan/update wrappers, and Quiet Guardian standing orders."
+    }
+  ]
+}
