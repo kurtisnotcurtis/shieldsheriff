@@ -45,7 +45,39 @@ type iconInfo struct {
 	HbmColor uintptr
 }
 
-// CreateSheriffBadgeIcon generates a 32x32 32-bit ARGB Win32 HICON depicting a 6-pointed Sheriff's Star badge.
+type pt2 struct{ x, y float64 }
+
+func pointInPoly(x, y float64, poly []pt2) bool {
+	inside := false
+	j := len(poly) - 1
+	for i := 0; i < len(poly); i++ {
+		yi, yj := poly[i].y, poly[j].y
+		xi, xj := poly[i].x, poly[j].x
+		if ((yi > y) != (yj > y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi) {
+			inside = !inside
+		}
+		j = i
+	}
+	return inside
+}
+
+func distToSegment(px, py, ax, ay, bx, by float64) float64 {
+	dx, dy := bx-ax, by-ay
+	lenSq := dx*dx + dy*dy
+	if lenSq == 0 {
+		return math.Hypot(px-ax, py-ay)
+	}
+	t := ((px-ax)*dx + (py-ay)*dy) / lenSq
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+	return math.Hypot(px-(ax+t*dx), py-(ay+t*dy))
+}
+
+// CreateSheriffBadgeIcon generates a 32x32 32-bit ARGB Win32 HICON depicting the
+// ShieldSheriff emblem (outer shield, Stetson hat, blindfold, earmuffs, and star badge).
 func CreateSheriffBadgeIcon(kind BadgeKind) uintptr {
 	const size = 32
 	hdr := bitmapInfoHeader{
@@ -72,138 +104,167 @@ func CreateSheriffBadgeIcon(kind BadgeKind) uintptr {
 
 	pixels := unsafe.Slice(bitsPtr, size*size)
 
-	// Palette selection (0xAARRGGBB)
-	var mainR, mainG, mainB float64
-	var rimR, rimG, rimB float64
+	// Accent palette for state indication (0xAARRGGBB)
+	var accR, accG, accB float64
 	switch kind {
 	case BadgeStandDown:
-		// Cool Cyan/Ice badge for Stand-Down (Paused)
-		mainR, mainG, mainB = 56, 189, 248
-		rimR, rimG, rimB = 14, 116, 144
+		// Cyan for Stand-Down (Paused)
+		accR, accG, accB = 56, 189, 248
 	case BadgeWarning:
-		// Amber/Orange badge for Drift or Tamper Warning
-		mainR, mainG, mainB = 251, 146, 60
-		rimR, rimG, rimB = 194, 65, 12
+		// Amber/Orange for Drift or Unprivileged Warning
+		accR, accG, accB = 251, 146, 60
 	default:
-		// Classic Sheriff Gold Star
-		mainR, mainG, mainB = 250, 204, 21
-		rimR, rimG, rimB = 180, 115, 9
+		// Classic Sheriff Gold
+		accR, accG, accB = 250, 204, 21
 	}
 
-	cx, cy := 15.5, 15.5
-	outerR := 12.2
-	innerR := 6.3
-	finialR := 1.55
+	// Outer shield polygon (32x32 space)
+	shieldPoly := []pt2{
+		{16.0, 2.2},
+		{27.6, 6.0},
+		{27.6, 17.2},
+		{23.8, 24.4},
+		{16.0, 29.8},
+		{8.2, 24.4},
+		{4.4, 17.2},
+		{4.4, 6.0},
+	}
 
-	// Precompute 12 vertices of the 6-pointed star + 6 tip centers for classic sheriff ball finials
-	type pt struct{ x, y float64 }
-	var poly [12]pt
-	var tips [6]pt
-	for i := 0; i < 12; i++ {
-		ang := -math.Pi/2 + float64(i)*(math.Pi/6.0)
-		r := outerR
+	// 5-point Sheriff star badge in lower shield
+	var starPoly [10]pt2
+	starCX, starCY := 16.0, 23.6
+	for i := 0; i < 10; i++ {
+		ang := -math.Pi/2 + float64(i)*(math.Pi/5.0)
+		r := 3.2
 		if i%2 == 1 {
-			r = innerR
+			r = 1.4
 		}
-		px := cx + r*math.Cos(ang)
-		py := cy + r*math.Sin(ang)
-		poly[i] = pt{px, py}
-		if i%2 == 0 {
-			tips[i/2] = pt{
-				x: cx + (outerR+0.7)*math.Cos(ang),
-				y: cy + (outerR+0.7)*math.Sin(ang),
-			}
-		}
+		starPoly[i] = pt2{starCX + r*math.Cos(ang), starCY + r*math.Sin(ang)}
 	}
 
-	inStar := func(x, y float64) bool {
-		// Point-in-polygon for 12-vertex star
-		inside := false
-		j := 11
-		for i := 0; i < 12; i++ {
-			yi, yj := poly[i].y, poly[j].y
-			xi, xj := poly[i].x, poly[j].x
-			if ((yi > y) != (yj > y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi) {
-				inside = !inside
-			}
-			j = i
-		}
-		if inside {
-			return true
-		}
-		// Check ball finials at the 6 star tips
-		for _, t := range tips {
-			dx, dy := x-t.x, y-t.y
-			if dx*dx+dy*dy <= finialR*finialR {
-				return true
-			}
-		}
-		return false
+	// Stetson hat crown polygon
+	hatCrown := []pt2{
+		{11.4, 11.4},
+		{12.6, 6.8},
+		{16.0, 7.8},
+		{19.4, 6.8},
+		{20.6, 11.4},
 	}
 
-	// Render with 2x2 supersampling
-	for py := 0; py < size; py++ {
-		for px := 0; px < size; px++ {
-			var covStar, covBg float64
-			for sy := 0; sy < 2; sy++ {
-				for sx := 0; sx < 2; sx++ {
-					fx := float64(px) + 0.25 + 0.5*float64(sx)
-					fy := float64(py) + 0.25 + 0.5*float64(sy)
-					dx, dy := fx-cx, fy-cy
-					dist := math.Sqrt(dx*dx + dy*dy)
-					if dist <= 15.0 {
-						covBg += 0.25
-					}
-					if inStar(fx, fy) {
-						covStar += 0.25
-					}
+	// Sample color at subpixel (fx, fy)
+	sampleColor := func(fx, fy float64) (r, g, b, a float64) {
+		if !pointInPoly(fx, fy, shieldPoly) {
+			return 0, 0, 0, 0
+		}
+
+		// Check shield outer rim
+		minEdge := 99.0
+		for i := 0; i < len(shieldPoly); i++ {
+			aPt := shieldPoly[i]
+			bPt := shieldPoly[(i+1)%len(shieldPoly)]
+			d := distToSegment(fx, fy, aPt.x, aPt.y, bPt.x, bPt.y)
+			if d < minEdge {
+				minEdge = d
+			}
+		}
+		if minEdge <= 1.25 {
+			return accR, accG, accB, 1.0
+		}
+
+		// Base dark navy shield fill
+		r, g, b = 15, 23, 42
+
+		// Shoulders silhouette
+		if fy >= 19.6 && fy <= 24.5 && math.Abs(fx-16.0) <= 6.2 {
+			dx := (fx - 16.0) / 6.2
+			dy := (fy - 24.5) / 4.9
+			if dx*dx+dy*dy <= 1.0 {
+				r, g, b = 30, 41, 59
+			}
+		}
+
+		// Sheriff Star badge on chest
+		if pointInPoly(fx, fy, starPoly[:]) {
+			return accR, accG, accB, 1.0
+		}
+
+		// Head circle
+		headDist := math.Hypot(fx-16.0, fy-15.2)
+		if headDist <= 4.1 {
+			if headDist >= 3.3 {
+				r, g, b = 148, 163, 184
+			} else {
+				r, g, b = 15, 23, 42
+			}
+		}
+
+		// Cyan Earmuffs (left & right of head)
+		if (fx >= 9.8 && fx <= 12.1 && fy >= 13.0 && fy <= 17.4) ||
+			(fx >= 19.9 && fx <= 22.2 && fy >= 13.0 && fy <= 17.4) {
+			r, g, b = 56, 189, 248
+		}
+
+		// Cyan Blindfold across eyes
+		if fx >= 11.7 && fx <= 20.3 && fy >= 13.7 && fy <= 16.1 {
+			r, g, b = 56, 189, 248
+		}
+
+		// Stetson Hat brim ellipse & crown (drawn over forehead)
+		brimDX := (fx - 16.0) / 7.8
+		brimDY := (fy - 11.8) / 1.6
+		brimD := brimDX*brimDX + brimDY*brimDY
+		if brimD <= 1.0 {
+			if brimD >= 0.52 {
+				return accR, accG, accB, 1.0
+			}
+			return 30, 41, 59, 1.0
+		}
+		if pointInPoly(fx, fy, hatCrown) {
+			minHat := 99.0
+			for i := 0; i < len(hatCrown); i++ {
+				aPt := hatCrown[i]
+				bPt := hatCrown[(i+1)%len(hatCrown)]
+				d := distToSegment(fx, fy, aPt.x, aPt.y, bPt.x, bPt.y)
+				if d < minHat {
+					minHat = d
 				}
 			}
+			if minHat <= 0.85 {
+				return accR, accG, accB, 1.0
+			}
+			return 30, 41, 59, 1.0
+		}
 
-			if covBg == 0 && covStar == 0 {
+		return r, g, b, 1.0
+	}
+
+	// Render with 3x3 supersampling
+	const ss = 3
+	const invSS2 = 1.0 / float64(ss*ss)
+	for py := 0; py < size; py++ {
+		for px := 0; px < size; px++ {
+			var sumR, sumG, sumB, sumA float64
+			for sy := 0; sy < ss; sy++ {
+				for sx := 0; sx < ss; sx++ {
+					fx := float64(px) + (float64(sx)+0.5)/float64(ss)
+					fy := float64(py) + (float64(sy)+0.5)/float64(ss)
+					sr, sg, sb, sa := sampleColor(fx, fy)
+					sumR += sr * sa
+					sumG += sg * sa
+					sumB += sb * sa
+					sumA += sa
+				}
+			}
+			cov := sumA * invSS2
+			if cov == 0 {
 				pixels[py*size+px] = 0
 				continue
 			}
-
-			dx, dy := float64(px)-cx, float64(py)-cy
-			dist := math.Sqrt(dx*dx + dy*dy)
-
-			// Dark slate circular badge backing so the star pops on both light and dark taskbars
-			bgR, bgG, bgB := 15.0, 23.0, 42.0
-			if dist > 13.5 {
-				// Subtle outer ring
-				bgR, bgG, bgB = rimR*0.6, rimG*0.6, rimB*0.6
-			}
-
-			var r, g, b, a float64
-			a = math.Max(covBg, covStar) * 255.0
-
-			if covStar > 0 {
-				// Slight metallic bevel shading from top-left to bottom-right
-				shade := 1.0 + (-dx-dy)*0.015
-				sr := math.Min(255, math.Max(0, mainR*shade))
-				sg := math.Min(255, math.Max(0, mainG*shade))
-				sb := math.Min(255, math.Max(0, mainB*shade))
-
-				// Center engraved ring on the sheriff star
-				if math.Abs(dist-3.2) < 0.75 {
-					sr, sg, sb = rimR, rimG, rimB
-				}
-
-				r = sr*covStar + bgR*(1.0-covStar)
-				g = sg*covStar + bgG*(1.0-covStar)
-				b = sb*covStar + bgB*(1.0-covStar)
-			} else {
-				r, g, b = bgR, bgG, bgB
-			}
-
-			// Premultiply alpha
-			alpha := uint32(math.Min(255, math.Max(0, a)))
-			af := float64(alpha) / 255.0
-			ri := uint32(math.Min(255, math.Max(0, r*af)))
-			gi := uint32(math.Min(255, math.Max(0, g*af)))
-			bi := uint32(math.Min(255, math.Max(0, b*af)))
-
+			// Premultiplied ARGB
+			alpha := uint32(math.Min(255, math.Max(0, cov*255.0)))
+			ri := uint32(math.Min(255, math.Max(0, sumR*invSS2)))
+			gi := uint32(math.Min(255, math.Max(0, sumG*invSS2)))
+			bi := uint32(math.Min(255, math.Max(0, sumB*invSS2)))
 			pixels[py*size+px] = (alpha << 24) | (ri << 16) | (gi << 8) | bi
 		}
 	}

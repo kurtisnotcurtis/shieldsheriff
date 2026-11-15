@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="site/logo.svg" alt="ShieldSheriff Logo" width="84" height="84" />
+</p>
+
 # ★ ShieldSheriff
 
 **Put Windows Defender Under Your Command — Nag-Free, Granular, Permanent Standing Orders for Windows 11.**
