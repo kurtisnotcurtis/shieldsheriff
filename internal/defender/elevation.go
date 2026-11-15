@@ -19,6 +19,7 @@ var (
 const (
 	tokenQuery          = 0x0008
 	tokenElevationClass = 20
+	swHide              = 0
 	swShowNormal        = 1
 )
 
@@ -79,13 +80,21 @@ func RelaunchElevated(extraArgs []string) error {
 	cwd, _ := os.Getwd()
 	cwdPtr, _ := syscall.UTF16PtrFromString(cwd)
 
+	showCmd := uintptr(swShowNormal)
+	if len(extraArgs) > 0 {
+		switch strings.ToLower(extraArgs[0]) {
+		case "ui", "tray", "dashboard", "--minimized":
+			showCmd = uintptr(swHide)
+		}
+	}
+
 	r1, _, lastErr := procShellExecuteW.Call(
 		0,
 		uintptr(unsafe.Pointer(verbPtr)),
 		uintptr(unsafe.Pointer(exePtr)),
 		uintptr(unsafe.Pointer(argPtr)),
 		uintptr(unsafe.Pointer(cwdPtr)),
-		swShowNormal,
+		showCmd,
 	)
 	// ShellExecuteW returns a value > 32 on success.
 	if r1 <= 32 {

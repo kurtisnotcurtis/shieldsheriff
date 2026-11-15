@@ -5,7 +5,7 @@ import "fmt"
 // CalVer release metadata (YYYY.0M.MICRO) tracking Windows 11 Defender platform evolution.
 const (
 	// Version is the current CalVer release of ShieldSheriff.
-	Version = "2026.11.2"
+	Version = "2026.11.3"
 
 	// Codename identifies the release milestone.
 	Codename = "Peacekeeper"

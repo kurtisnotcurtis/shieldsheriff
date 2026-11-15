@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -24,11 +26,14 @@ var dashboardHTML []byte
 
 // Server hosts the local ShieldSheriff Command Center UI on 127.0.0.1.
 type Server struct {
-	gov      *sheriff.Governor
-	addr     string
-	url      string
-	openMu   sync.Mutex
-	lastOpen time.Time
+	gov        *sheriff.Governor
+	addr       string
+	url        string
+	ln         net.Listener
+	httpSrv    *http.Server
+	onShutdown func()
+	openMu     sync.Mutex
+	lastOpen   time.Time
 }
 
 // StartServer starts the local loopback Command Center HTTP server.
@@ -49,10 +54,32 @@ func StartServer(gov *sheriff.Governor, preferredPort int) (*Server, error) {
 		gov:  gov,
 		addr: ln.Addr().String(),
 		url:  "http://" + ln.Addr().String(),
+		ln:   ln,
 	}
+	s.httpSrv = &http.Server{Handler: s.Handler()}
 
-	go http.Serve(ln, s.Handler())
+	go func() {
+		if err := s.httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			_ = ln.Close()
+		}
+	}()
 	return s, nil
+}
+
+// SetOnShutdown registers a callback used when the server initiates a process shutdown (e.g. UAC relaunch).
+func (s *Server) SetOnShutdown(fn func()) {
+	s.onShutdown = fn
+}
+
+// Shutdown gracefully stops the Command Center HTTP server.
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.httpSrv != nil {
+		return s.httpSrv.Shutdown(ctx)
+	}
+	if s.ln != nil {
+		return s.ln.Close()
+	}
+	return nil
 }
 
 // NewServer constructs a Server instance for handler use or testing.
@@ -231,6 +258,10 @@ func (s *Server) handleElevate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "message": "Launched elevated ShieldSheriff instance"})
 	go func() {
 		time.Sleep(600 * time.Millisecond)
+		if s.onShutdown != nil {
+			s.onShutdown()
+			return
+		}
 		os.Exit(0)
 	}()
 }

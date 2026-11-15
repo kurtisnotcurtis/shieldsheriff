@@ -1,11 +1,16 @@
+//go:generate go run github.com/tc-hib/go-winres@latest make --in winres/winres.json --out rsrc --arch amd64,arm64
+
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"shieldsheriff/internal/defender"
@@ -66,6 +71,8 @@ func hasFlag(args []string, flag string) bool {
 }
 
 func runInteractive(openWindowOnStart bool, replaceExisting bool) {
+	suppressOwnedConsoleWindow()
+
 	const instanceMutexName = `Local\ShieldSheriffCommandCenterInstance`
 	const preferredPort = 38419
 
@@ -123,8 +130,26 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool) {
 	appTray := tray.NewAppTray(gov, func() {
 		srv.OpenWindow()
 	})
-	if err := appTray.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "System tray error: %v\n", err)
+	appTray.SetServerURL(srv.URL())
+	srv.SetOnShutdown(appTray.Quit)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	go func() {
+		<-sigCh
+		appTray.Quit()
+	}()
+
+	trayErr := appTray.Run()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	_ = srv.Shutdown(shutdownCtx)
+	cancel()
+	gov.StopLoop()
+
+	if trayErr != nil {
+		fmt.Fprintf(os.Stderr, "System tray error: %v\n", trayErr)
 		os.Exit(1)
 	}
 }

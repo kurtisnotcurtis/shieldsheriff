@@ -3,6 +3,7 @@ package tray
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -24,6 +25,7 @@ var (
 	procDispatchMessageW  = modUser32.NewProc("DispatchMessageW")
 	procPostQuitMessage   = modUser32.NewProc("PostQuitMessage")
 	procPostMessageW      = modUser32.NewProc("PostMessageW")
+	procDestroyWindow     = modUser32.NewProc("DestroyWindow")
 	procCreatePopupMenu   = modUser32.NewProc("CreatePopupMenu")
 	procAppendMenuW       = modUser32.NewProc("AppendMenuW")
 	procDestroyMenu       = modUser32.NewProc("DestroyMenu")
@@ -33,9 +35,12 @@ var (
 )
 
 const (
-	wmDestroy       = 0x0002
-	wmCommand       = 0x0111
-	wmUser          = 0x0400
+	wmDestroy         = 0x0002
+	wmClose           = 0x0010
+	wmQueryEndSession = 0x0011
+	wmEndSession      = 0x0016
+	wmCommand         = 0x0111
+	wmUser            = 0x0400
 	wmTrayCallback  = wmUser + 1
 	wmSyncTrayState = wmUser + 2
 
@@ -154,6 +159,7 @@ type notifyIconDataW struct {
 type AppTray struct {
 	gov           *sheriff.Governor
 	openDashboard func()
+	serverURL     string
 	hwnd          uintptr
 	iconGold      uintptr
 	iconStandDown uintptr
@@ -175,6 +181,21 @@ func NewAppTray(gov *sheriff.Governor, openDashboard func()) *AppTray {
 		}
 	})
 	return t
+}
+
+// SetServerURL sets the Command Center URL displayed in tray status indicators.
+func (t *AppTray) SetServerURL(url string) {
+	t.serverURL = strings.TrimSpace(url)
+	if t.hwnd != 0 {
+		procPostMessageW.Call(t.hwnd, wmSyncTrayState, 0, 0)
+	}
+}
+
+// Quit requests the system tray message loop to exit cleanly.
+func (t *AppTray) Quit() {
+	if t.hwnd != 0 {
+		procPostMessageW.Call(t.hwnd, wmClose, 0, 0)
+	}
 }
 
 // Run starts the Win32 System Tray message loop on the current goroutine.
@@ -222,6 +243,12 @@ func (t *AppTray) Run() error {
 	}
 	t.refreshIconAndTip(true)
 
+	startupMsg := "Running in the background. Right-click the star icon for options or to exit."
+	if t.serverURL != "" {
+		startupMsg = fmt.Sprintf("Command Center running at %s. Right-click the star icon for options or to exit.", t.serverURL)
+	}
+	t.ShowBalloon("ShieldSheriff Running", startupMsg)
+
 	var m msg
 	for {
 		ret, _, _ := procGetMessageW.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
@@ -239,22 +266,14 @@ func (t *AppTray) Run() error {
 func (t *AppTray) refreshIconAndTip(initial bool) {
 	st, ord, sd, _, _ := t.gov.Snapshot()
 	var icon uintptr
-	var tip string
-
 	if sd.Active {
 		icon = t.iconStandDown
-		tip = fmt.Sprintf("ShieldSheriff — Deputy Standing Down (%s)", sd.Reason)
 	} else if !st.InCompliance || st.TamperProtectionActive {
 		icon = t.iconWarn
-		tip = fmt.Sprintf("ShieldSheriff — %d Drift Item(s) | Preset: %s", len(st.DriftItems), ord.PresetName)
 	} else {
 		icon = t.iconGold
-		rtp := "ON"
-		if !st.RealtimeProtection {
-			rtp = "OFF"
-		}
-		tip = fmt.Sprintf("ShieldSheriff ★ Keeping the Peace | Real-Time: %s | Nags: Silenced", rtp)
 	}
+	tip := formatTrayTip(t.serverURL, st, ord, sd)
 
 	t.nid.HIcon = icon
 	t.nid.UFlags = nifMessage | nifIcon | nifTip
@@ -265,6 +284,35 @@ func (t *AppTray) refreshIconAndTip(initial bool) {
 		action = uintptr(nimAdd)
 	}
 	procShellNotifyIconW.Call(action, uintptr(unsafe.Pointer(&t.nid)))
+}
+
+func formatTrayTip(serverURL string, st defender.DeputyStatus, ord defender.StandingOrders, sd defender.StandDownState) string {
+	addrSuffix := ""
+	if hostPort := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(serverURL), "http://"), "https://"); hostPort != "" {
+		addrSuffix = " (" + hostPort + ")"
+	}
+	if sd.Active {
+		return fmt.Sprintf("ShieldSheriff — Running%s | Standing Down (%s)", addrSuffix, sd.Reason)
+	}
+	if !st.InCompliance || st.TamperProtectionActive {
+		return fmt.Sprintf("ShieldSheriff — Running%s | %d Drift Item(s) | %s", addrSuffix, len(st.DriftItems), ord.PresetName)
+	}
+	rtp := "ON"
+	if !st.RealtimeProtection {
+		rtp = "OFF"
+	}
+	return fmt.Sprintf("ShieldSheriff ★ Running%s | Real-Time: %s | Nags: Silenced", addrSuffix, rtp)
+}
+
+func formatTrayStatusLabel(serverURL string, st defender.DeputyStatus) string {
+	label := "● ShieldSheriff Running"
+	if hostPort := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(serverURL), "http://"), "https://"); hostPort != "" {
+		label = "● Running — " + hostPort
+	}
+	if st.IsElevated {
+		return label + " (Admin)"
+	}
+	return label + " (Read-Only)"
 }
 
 // ShowBalloon displays a subtle tray notification from ShieldSheriff itself.
@@ -321,6 +369,19 @@ func trayWndProc(hwnd uintptr, msgID uint32, wParam, lParam uintptr) uintptr {
 		}
 		return 0
 
+	case wmClose:
+		procDestroyWindow.Call(hwnd)
+		return 0
+
+	case wmQueryEndSession:
+		return 1
+
+	case wmEndSession:
+		if wParam != 0 {
+			procDestroyWindow.Call(hwnd)
+		}
+		return 0
+
 	case wmDestroy:
 		procPostQuitMessage.Call(0)
 		return 0
@@ -350,6 +411,9 @@ func (t *AppTray) showContextMenu() {
 		return
 	}
 	defer procDestroyMenu.Call(hMenu)
+
+	appendMenuItem(hMenu, mfString|mfGrayed, 0, formatTrayStatusLabel(t.serverURL, st))
+	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
 	appendMenuItem(hMenu, mfString, cmdOpenDashboard, "★ Open ShieldSheriff Command Center")
 	if !st.IsElevated {
@@ -403,7 +467,7 @@ func (t *AppTray) showContextMenu() {
 	appendMenuItem(hMenu, mfPopup, hActions, "Deputy Actions")
 
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
-	appendMenuItem(hMenu, mfString, cmdExit, "Exit ShieldSheriff Tray")
+	appendMenuItem(hMenu, mfString, cmdExit, "Exit ShieldSheriff (Stop Server & Tray)")
 
 	var pt point
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
@@ -433,7 +497,7 @@ func (t *AppTray) handleCommand(cmd uint32) {
 		}
 	case cmdElevateNow:
 		if err := defender.RelaunchElevated([]string{"ui", "--replace"}); err == nil {
-			procPostQuitMessage.Call(0)
+			t.Quit()
 		}
 
 	case cmdPresetQuietGuardian, cmdPresetDevWork, cmdPresetOnDemand, cmdPresetFullShield:
@@ -538,6 +602,10 @@ func (t *AppTray) handleCommand(cmd uint32) {
 		_ = defender.OpenWindowsSecuritySettings()
 
 	case cmdExit:
-		procPostQuitMessage.Call(0)
+		if t.hwnd != 0 {
+			procDestroyWindow.Call(t.hwnd)
+		} else {
+			procPostQuitMessage.Call(0)
+		}
 	}
 }

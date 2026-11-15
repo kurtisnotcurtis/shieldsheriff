@@ -1,0 +1,133 @@
+name: Release ShieldSheriff (Portable Windows & Winget)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (defaults to v<VERSION.json version>)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Resolve Release Version & Tag
+        id: meta
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag) -and "${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+          }
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $vj = Get-Content VERSION.json -Raw | ConvertFrom-Json
+            $tag = "v$($vj.version)"
+          }
+          $version = $tag.TrimStart("v")
+          $releaseDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "release_date=$releaseDate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Run Tests & Vet
+        shell: pwsh
+        run: |
+          go vet ./...
+          go test -v ./...
+
+      - name: Embed Windows VersionInfo & App Manifest (.syso)
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.meta.outputs.version }}"
+          $winVer = "$ver.0"
+          go install github.com/tc-hib/go-winres@latest
+          $winresPath = Join-Path (go env GOPATH) "bin\go-winres.exe"
+          Push-Location cmd/shieldsheriff
+          & $winresPath make `
+            --in winres/winres.json `
+            --out rsrc `
+            --arch amd64,arm64 `
+            --product-version $winVer `
+            --file-version $winVer
+          Pop-Location
+
+      - name: Build Portable Binaries & Archives
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.meta.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+          foreach ($arch in @("amd64", "arm64")) {
+            $stage = "dist/stage-$arch"
+            New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+            $env:CGO_ENABLED = "0"
+            $env:GOOS = "windows"
+            $env:GOARCH = $arch
+            go build -trimpath -ldflags="-s -w" -o "$stage/shieldsheriff.exe" ./cmd/shieldsheriff
+
+            Copy-Item README.md, LICENSE -Destination $stage
+            $zipPath = "dist/shieldsheriff-$ver-windows-$arch.zip"
+            Compress-Archive -Path "$stage/*" -DestinationPath $zipPath -Force
+          }
+
+          $shaAmd64 = (Get-FileHash "dist/shieldsheriff-$ver-windows-amd64.zip" -Algorithm SHA256).Hash
+          $shaArm64 = (Get-FileHash "dist/shieldsheriff-$ver-windows-arm64.zip" -Algorithm SHA256).Hash
+
+          @(
+            "$shaAmd64  shieldsheriff-$ver-windows-amd64.zip"
+            "$shaArm64  shieldsheriff-$ver-windows-arm64.zip"
+          ) | Set-Content -Path "dist/SHA256SUMS.txt" -Encoding utf8
+
+          "sha256_amd64=$shaAmd64" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sha256_arm64=$shaArm64" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        id: build
+
+      - name: Render Winget Manifests
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.meta.outputs.version }}"
+          $date = "${{ steps.meta.outputs.release_date }}"
+          $shaAmd64 = "${{ steps.build.outputs.sha256_amd64 }}"
+          $shaArm64 = "${{ steps.build.outputs.sha256_arm64 }}"
+
+          $outDir = "dist/winget/kurtisnotcurtis.ShieldSheriff/$ver"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          Get-ChildItem "packaging/winget/kurtisnotcurtis.ShieldSheriff/*.yaml" | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            $content = $content.Replace("__VERSION__", $ver)
+            $content = $content.Replace("__RELEASE_DATE__", $date)
+            $content = $content.Replace("__SHA256_AMD64__", $shaAmd64)
+            $content = $content.Replace("__SHA256_ARM64__", $shaArm64)
+            Set-Content -Path (Join-Path $outDir $_.Name) -Value $content -Encoding utf8 -NoNewline
+          }
+
+          Compress-Archive -Path "dist/winget/*" -DestinationPath "dist/winget-manifests-$ver.zip" -Force
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "ShieldSheriff ${{ steps.meta.outputs.tag }}"
+          generate_release_notes: true
+          files: |
+            dist/shieldsheriff-${{ steps.meta.outputs.version }}-windows-amd64.zip
+            dist/shieldsheriff-${{ steps.meta.outputs.version }}-windows-arm64.zip
+            dist/SHA256SUMS.txt
+            dist/winget-manifests-${{ steps.meta.outputs.version }}.zip

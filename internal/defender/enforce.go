@@ -213,7 +213,7 @@ func Enforce(orders StandingOrders, standDown *StandDownState) EnforceResult {
 		}
 		// Gently stop running SecurityHealthSystray.exe if active
 		killCmd := exec.Command("taskkill.exe", "/F", "/IM", "SecurityHealthSystray.exe")
-		killCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		killCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 		_ = killCmd.Run()
 		res.Applied = append(res.Applied, "Muted Windows Security default tray icon (HideSystray=1)")
 	} else {
@@ -310,7 +310,7 @@ func syncWMIPreferences(effectiveRTP bool, orders StandingOrders) error {
 	)
 
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v (%s)", err, strings.TrimSpace(string(out)))
@@ -326,7 +326,7 @@ func RunQuickScan() (string, error) {
 		return "", fmt.Errorf("MpCmdRun.exe not found")
 	}
 	cmd := exec.Command(st.MpCmdRunPath, "-Scan", "-ScanType", "1")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
@@ -338,7 +338,7 @@ func UpdateSignatures() (string, error) {
 		return "", fmt.Errorf("MpCmdRun.exe not found")
 	}
 	cmd := exec.Command(st.MpCmdRunPath, "-SignatureUpdate")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }

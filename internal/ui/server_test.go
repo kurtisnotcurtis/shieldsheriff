@@ -1,11 +1,13 @@
 package ui
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"shieldsheriff/internal/sheriff"
 )
@@ -65,5 +67,26 @@ func TestServerEndpoints(t *testing.T) {
 	h.ServeHTTP(recMissing, reqMissing)
 	if recMissing.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for unknown preset image, got %d", recMissing.Code)
+	}
+}
+
+func TestServerStartAndShutdown(t *testing.T) {
+	gov := sheriff.NewGovernor()
+	srv, err := StartServer(gov, 0)
+	if err != nil {
+		t.Fatalf("StartServer failed: %v", err)
+	}
+	if srv.URL() == "" || srv.ln == nil || srv.httpSrv == nil {
+		t.Fatalf("expected initialized server, url=%q", srv.URL())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	if _, err := srv.ln.Accept(); err == nil {
+		t.Fatalf("expected listener to be closed after Shutdown")
 	}
 }

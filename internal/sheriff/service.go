@@ -133,6 +133,12 @@ func RunWindowsService() error {
 	return nil
 }
 
+func scCommand(args ...string) *exec.Cmd {
+	cmd := exec.Command("sc.exe", args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	return cmd
+}
+
 // InstallService registers and starts ShieldSheriff as an automatic SYSTEM Windows Service.
 func InstallService() (string, error) {
 	exe, err := os.Executable()
@@ -141,7 +147,7 @@ func InstallService() (string, error) {
 	}
 	binPath := fmt.Sprintf(`"%s" service run`, exe)
 
-	createCmd := exec.Command("sc.exe", "create", ServiceName,
+	createCmd := scCommand("create", ServiceName,
 		"binPath=", binPath,
 		"DisplayName=", ServiceDisplayName,
 		"start=", "auto",
@@ -151,8 +157,8 @@ func InstallService() (string, error) {
 		return strings.TrimSpace(string(out)), err
 	}
 
-	_ = exec.Command("sc.exe", "description", ServiceName, ServiceDescription).Run()
-	startOut, startErr := exec.Command("sc.exe", "start", ServiceName).CombinedOutput()
+	_ = scCommand("description", ServiceName, ServiceDescription).Run()
+	startOut, startErr := scCommand("start", ServiceName).CombinedOutput()
 	if startErr != nil && !strings.Contains(string(startOut), "1056") { // 1056 = already running
 		return strings.TrimSpace(string(startOut)), startErr
 	}
@@ -161,7 +167,7 @@ func InstallService() (string, error) {
 
 // UninstallService stops and removes the ShieldSheriff Windows Service.
 func UninstallService() (string, error) {
-	_ = exec.Command("sc.exe", "stop", ServiceName).Run()
-	out, err := exec.Command("sc.exe", "delete", ServiceName).CombinedOutput()
+	_ = scCommand("stop", ServiceName).Run()
+	out, err := scCommand("delete", ServiceName).CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
