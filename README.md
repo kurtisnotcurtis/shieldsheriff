@@ -36,7 +36,7 @@ shieldsheriff/
 │   │   ├── governor.go             # Drift auto-healer, Stand-Down timer & Win32 Toolhelp32 process watcher
 │   │   └── service.go              # Native Windows Service (SCM) dispatcher & installer
 │   ├── tray/
-│   │   ├── icon.go                 # Procedural 32-bit ARGB 6-Pointed Sheriff Star HICON renderer
+│   │   ├── icon.go                 # Procedural 32-bit ARGB ShieldSheriff emblem HICON renderer
 │   │   └── systray.go              # Native Win32 Shell_NotifyIconW System Tray & popup menu
 │   ├── ui/
 │   │   ├── server.go               # Localhost (127.0.0.1) Command Center server & isolated Edge App launcher
@@ -72,15 +72,15 @@ go build -o bin\shieldsheriff.exe ./cmd/shieldsheriff
 .\bin\shieldsheriff.exe elect --elevate
 ```
 
-### 4. Launch the System Tray Star & Command Center UI
+### 4. Launch the System Tray Shield & Command Center UI
 ```powershell
 .\bin\shieldsheriff.exe
 ```
 - **Sheriff Preset Cards + Granular Overrides:** Choose from 4 illustrated Sheriff presets (**On-Demand Deputy** → **Developer Workstation** → **Quiet Guardian** → **Full Shield**) with live hover-diff preview and per-setting overrides.
 - **Single-Instance Locking:** Relaunching focuses the existing Command Center window instead of opening duplicates.
-- **Gold Sheriff Star** in the system tray: In compliance & keeping the peace.
-- **Cyan Sheriff Star**: Deputy is temporarily standing down (paused by timer or watched build process).
-- **Amber Sheriff Star**: Drift detected or running unprivileged.
+- **Gold Shield** in the system tray: In compliance & keeping the peace.
+- **Cyan Shield**: Deputy is temporarily standing down (paused by timer or watched build process).
+- **Amber Shield**: Drift detected, Tamper Protection is active, or running unprivileged.
 
 ### 5. Granular CLI Control
 ```powershell

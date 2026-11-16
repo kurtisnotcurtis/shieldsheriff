@@ -103,6 +103,21 @@ func CreateSheriffBadgeIcon(kind BadgeKind) uintptr {
 	defer procDeleteObject.Call(hbmColor)
 
 	pixels := unsafe.Slice(bitsPtr, size*size)
+	renderSheriffBadgePixels(kind, size, pixels)
+
+	hbmMask, _, _ := procCreateBitmap.Call(size, size, 1, 1, 0)
+	defer procDeleteObject.Call(hbmMask)
+
+	ii := iconInfo{
+		IsIcon:   1,
+		HbmMask:  hbmMask,
+		HbmColor: hbmColor,
+	}
+	hIcon, _, _ := procCreateIconIndirect.Call(uintptr(unsafe.Pointer(&ii)))
+	return hIcon
+}
+
+func renderSheriffBadgePixels(kind BadgeKind, size int, pixels []uint32) {
 
 	// Accent palette for state indication (0xAARRGGBB)
 	var accR, accG, accB float64
@@ -268,15 +283,4 @@ func CreateSheriffBadgeIcon(kind BadgeKind) uintptr {
 			pixels[py*size+px] = (alpha << 24) | (ri << 16) | (gi << 8) | bi
 		}
 	}
-
-	hbmMask, _, _ := procCreateBitmap.Call(size, size, 1, 1, 0)
-	defer procDeleteObject.Call(hbmMask)
-
-	ii := iconInfo{
-		IsIcon:   1,
-		HbmMask:  hbmMask,
-		HbmColor: hbmColor,
-	}
-	hIcon, _, _ := procCreateIconIndirect.Call(uintptr(unsafe.Pointer(&ii)))
-	return hIcon
 }

@@ -243,9 +243,9 @@ func (t *AppTray) Run() error {
 	}
 	t.refreshIconAndTip(true)
 
-	startupMsg := "Running in the background. Right-click the star icon for options or to exit."
+	startupMsg := "Running in the background. Right-click the shield icon for options or to exit."
 	if t.serverURL != "" {
-		startupMsg = fmt.Sprintf("Command Center running at %s. Right-click the star icon for options or to exit.", t.serverURL)
+		startupMsg = fmt.Sprintf("Command Center running at %s. Right-click the shield icon for options or to exit.", t.serverURL)
 	}
 	t.ShowBalloon("ShieldSheriff Running", startupMsg)
 
