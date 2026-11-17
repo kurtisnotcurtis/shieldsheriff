@@ -9,9 +9,9 @@ $ver = $vj.version
 $relDate = $vj.releasedOn
 
 if ($Test) {
-    go vet ./...
+    go vet -mod=readonly ./...
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    go test -count=1 ./...
+    go test -mod=readonly -count=1 ./...
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
@@ -20,7 +20,7 @@ $env:GOOS = "windows"
 $ldflags = "-s -w -X shieldsheriff/internal/version.Version=$ver -X shieldsheriff/internal/version.ReleasedOn=$relDate"
 
 New-Item -ItemType Directory -Force -Path bin | Out-Null
-go build -trimpath -ldflags="$ldflags" -o bin\shiesh.exe ./cmd/shieldsheriff
+go build -mod=readonly -trimpath -ldflags="$ldflags" -o bin\shiesh.exe ./cmd/shieldsheriff
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Built bin\shiesh.exe (v$ver)"

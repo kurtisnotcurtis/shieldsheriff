@@ -47,15 +47,15 @@ jobs:
       - name: Run Tests & Vet
         shell: pwsh
         run: |
-          go vet ./...
-          go test -v ./...
+          go vet -mod=readonly ./...
+          go test -mod=readonly -v ./...
 
       - name: Embed Windows VersionInfo & App Manifest (.syso)
         shell: pwsh
         run: |
           $ver = "${{ steps.meta.outputs.version }}"
           $winVer = "$ver.0"
-          go install github.com/tc-hib/go-winres@latest
+          go install github.com/tc-hib/go-winres@v0.3.3
           $winresPath = Join-Path (go env GOPATH) "bin\go-winres.exe"
           Push-Location cmd/shieldsheriff
           & $winresPath make `
@@ -81,7 +81,7 @@ jobs:
             $env:CGO_ENABLED = "0"
             $env:GOOS = "windows"
             $env:GOARCH = $arch
-            go build -trimpath -ldflags="$ldflags" -o "$stage/shiesh.exe" ./cmd/shieldsheriff
+            go build -mod=readonly -trimpath -ldflags="$ldflags" -o "$stage/shiesh.exe" ./cmd/shieldsheriff
 
             Copy-Item README.md, LICENSE -Destination $stage
             $zipPath = "dist/shieldsheriff-$ver-windows-$arch.zip"
