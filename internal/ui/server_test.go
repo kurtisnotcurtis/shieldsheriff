@@ -33,8 +33,8 @@ func TestServerEndpoints(t *testing.T) {
 	if err := json.NewDecoder(rec2.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode /api/state failed: %v", err)
 	}
-	if payload["status"] == nil || payload["orders"] == nil {
-		t.Fatalf("missing status or orders in /api/state response")
+	if payload["status"] == nil || payload["orders"] == nil || payload["firstRun"] == nil || payload["theme"] == nil {
+		t.Fatalf("missing status, orders, firstRun, or theme in /api/state response")
 	}
 
 	// 3. POST /api/standdown?minutes=15

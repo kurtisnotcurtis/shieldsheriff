@@ -3,72 +3,219 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ShieldSheriff — Command Center</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 13 L32 6 L54 13 V33 C54 47 43 55 32 59 C21 55 10 47 10 33 Z' fill='%230F172A' stroke='%23FACC15' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cpath d='M19 48 C21 41 26 39 32 39 C38 39 43 41 45 48' fill='%231E293B' stroke='%2364748B' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpolygon points='32,42 33.6,46 38,46 34.5,48.5 35.8,52.5 32,50 28.2,52.5 29.5,48.5 26,46 30.4,46' fill='%23FACC15'/%3E%3Ccircle cx='32' cy='30' r='8' fill='%230F172A' stroke='%2394A3B8' stroke-width='1.5'/%3E%3Crect x='20.5' y='26' width='4' height='8' rx='2' fill='%2338BDF8'/%3E%3Crect x='39.5' y='26' width='4' height='8' rx='2' fill='%2338BDF8'/%3E%3Crect x='23.5' y='27.2' width='17' height='4.4' rx='1.6' fill='%2338BDF8'/%3E%3Cpath d='M22 23 L25 13 Q32 15.5 39 13 L42 23 Z' fill='%231E293B' stroke='%23FACC15' stroke-width='1.6'/%3E%3Cellipse cx='32' cy='23.5' rx='15' ry='3' fill='%231E293B' stroke='%23FACC15' stroke-width='1.6'/%3E%3C/svg%3E">
+<title>ShieldSheriff</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 14 L32 7 L52 14 V31 C52 45 42 54 32 58 C22 54 12 45 12 31 Z' fill='%230F172A' stroke='%23FACC15' stroke-width='3' stroke-linejoin='round'/%3E%3Cg transform='rotate(-7 32 33)'%3E%3Cpath d='M17 37 C17 31 22 28.5 27 29.5 L41.5 30.5 C46 30 48.5 32.5 47.5 35.5 C46.5 38 40.5 37 35.5 40.5 C30.5 44 22.5 46.5 18.5 43.5 C16.8 42 16.8 39.5 17 37 Z' fill='%23FACC15'/%3E%3Cpath d='M23.5 33 L25 22.5 C26 19.5 38 18.5 40 21.5 L42 32.5 Z' fill='%23FACC15'/%3E%3Cpath d='M22.5 33.5 Q32 33 42.5 31.5' stroke='%230F172A' stroke-width='1.9' stroke-linecap='round'/%3E%3Cpath d='M20 42.2 Q29 41.2 37 36.2 Q42 33.4 46 34.2' stroke='%230F172A' stroke-width='1.7' stroke-linecap='round'/%3E%3Cpath d='M26.5 23.8 Q32 24.8 38.5 21.8' stroke='%230F172A' stroke-width='1.7' stroke-linecap='round'/%3E%3Cpath d='M34.5 24.8 Q32.5 27.6 36.5 29' stroke='%230F172A' stroke-width='1.6' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E">
 <style>
   :root {
-    --bg: #0b0f19;
-    --panel: #111827;
-    --panel-alt: #1a2438;
-    --border: #26334d;
+    --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --bg: #202020;
+    --panel: #2b2b2b;
+    --panel-alt: #323232;
+    --nav-hover: rgba(255, 255, 255, 0.055);
+    --nav-active: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.08);
+    --divider: rgba(255, 255, 255, 0.06);
+    --accent: #60cdff;
+    --accent-fg: #000000;
+    --accent-dim: rgba(96, 205, 255, 0.14);
     --gold: #facc15;
     --gold-dim: rgba(250, 204, 21, 0.14);
-    --cyan: #38bdf8;
-    --cyan-dim: rgba(56, 189, 248, 0.14);
-    --green: #22c55e;
-    --green-dim: rgba(34, 197, 94, 0.14);
+    --green: #4ade80;
+    --green-dim: rgba(34, 197, 94, 0.15);
+    --red: #f87171;
+    --red-dim: rgba(239, 68, 68, 0.15);
     --amber: #fb923c;
     --amber-dim: rgba(251, 146, 60, 0.15);
-    --text: #f8fafc;
-    --muted: #94a3b8;
+    --text: #ffffff;
+    --muted: #a1a1aa;
+    --switch-off-border: rgba(255, 255, 255, 0.45);
+    --switch-off-dot: rgba(255, 255, 255, 0.78);
+    --audit-bg: #181818;
+    --audit-text: #d4d4d8;
+  }
+  body.light {
+    --bg: #f3f3f3;
+    --panel: #ffffff;
+    --panel-alt: #f9f9f9;
+    --nav-hover: rgba(0, 0, 0, 0.04);
+    --nav-active: rgba(0, 0, 0, 0.065);
+    --border: rgba(0, 0, 0, 0.08);
+    --divider: rgba(0, 0, 0, 0.06);
+    --accent: #0067c0;
+    --accent-fg: #ffffff;
+    --accent-dim: rgba(0, 103, 192, 0.10);
+    --gold: #b45309;
+    --gold-dim: rgba(217, 119, 6, 0.12);
+    --green: #15803d;
+    --green-dim: rgba(22, 163, 74, 0.12);
+    --red: #b91c1c;
+    --red-dim: rgba(220, 38, 38, 0.12);
+    --amber: #c2410c;
+    --amber-dim: rgba(234, 88, 12, 0.12);
+    --text: #1a1a1a;
+    --muted: #5f6368;
+    --switch-off-border: rgba(0, 0, 0, 0.45);
+    --switch-off-dot: rgba(0, 0, 0, 0.62);
+    --audit-bg: #f7f7f7;
+    --audit-text: #27272a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
-    background: radial-gradient(circle at top right, #172036 0%, var(--bg) 65%);
+    font-family: var(--font-ui);
+    background: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    padding: 10px 14px 14px;
-    line-height: 1.35;
     font-size: 13px;
+    line-height: 1.38;
     overflow-x: hidden;
   }
-  .container { max-width: 800px; margin: 0 auto; }
 
-  /* Compact Header */
-  header {
+  /* Windows 11 Settings Two-Column Shell */
+  .shell {
+    display: flex;
+    min-height: 100vh;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 12px 20px 16px 12px;
+    gap: 20px;
+  }
+
+  /* Left Navigation Sidebar */
+  .sidebar {
+    width: 228px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 6px 8px 14px;
+  }
+  .sidebar-brand svg {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+  .sidebar-brand h2 {
+    font-size: 0.94rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .sidebar-brand p {
+    font-size: 0.74rem;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .nav-group-label {
+    font-size: 0.71rem;
+    font-weight: 600;
+    color: var(--muted);
+    padding: 6px 10px 3px;
+    letter-spacing: 0.01em;
+  }
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 8px 10px 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 0.84rem;
+    font-weight: 400;
+    transition: background 0.1s ease;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--nav-hover); }
+  .nav-item.active {
+    background: var(--nav-active);
+    font-weight: 600;
+  }
+  .nav-item.active::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--accent);
+  }
+  .nav-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .nav-icon svg { width: 14px; height: 14px; }
+  .nav-item-text {
+    min-width: 0;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-sep {
+    height: 1px;
+    background: var(--divider);
+    margin: 6px 10px;
+  }
+
+  /* Right Content Pane */
+  .main-pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .page-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 8px 12px;
-    background: rgba(17, 24, 39, 0.9);
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    backdrop-filter: blur(10px);
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding-top: 4px;
   }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .brand svg { width: 36px; height: 36px; flex-shrink: 0; filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.25)); }
-  .brand h1 { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-  .brand p { font-size: 0.74rem; color: var(--muted); }
+  .page-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .page-head h1 {
+    font-size: 1.45rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 
-  .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .pill {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 9px;
+    padding: 3px 9px;
     border-radius: 999px;
-    font-size: 0.71rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
     white-space: nowrap;
   }
-  .pill.gold { background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(250, 204, 21, 0.35); }
-  .pill.green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.35); }
-  .pill.cyan { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.35); }
-  .pill.amber { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251, 146, 60, 0.4); }
+  .pill.accent { background: var(--accent-dim); color: var(--accent); }
+  .pill.gold { background: var(--gold-dim); color: var(--gold); }
+  .pill.green { background: var(--green-dim); color: var(--green); }
+  .pill.red { background: var(--red-dim); color: var(--red); }
+  .pill.amber { background: var(--amber-dim); color: var(--amber); }
 
   button {
     font-family: inherit;
@@ -76,90 +223,55 @@
     border: 1px solid var(--border);
     background: var(--panel-alt);
     color: var(--text);
-    padding: 6px 11px;
-    border-radius: 7px;
-    font-size: 0.77rem;
+    padding: 6px 13px;
+    border-radius: 5px;
+    font-size: 0.78rem;
     font-weight: 600;
-    transition: all 0.14s ease;
+    transition: all 0.12s ease;
   }
-  button:hover { border-color: var(--gold); background: #26354f; }
+  button:hover { border-color: var(--accent); background: var(--accent-dim); }
   button.primary {
-    background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
-    color: #0f172a;
-    border-color: #facc15;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
   }
-  button.primary:hover { filter: brightness(1.06); }
+  button.primary:hover { filter: brightness(1.06); background: var(--accent); }
+  button:disabled { opacity: 0.42; cursor: not-allowed; filter: none; }
   button.warn {
     background: var(--amber-dim);
     color: var(--amber);
     border-color: rgba(251, 146, 60, 0.45);
   }
 
-  /* Alert Callouts */
-  .callout {
-    padding: 9px 13px;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    display: none;
+  /* Unified Status Hero */
+  .status-hero {
+    display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-  }
-  .callout.amber { background: rgba(251, 146, 60, 0.1); border: 1px solid rgba(251, 146, 60, 0.4); }
-  .callout.cyan { background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.4); }
-  .callout h3 { font-size: 0.83rem; margin-bottom: 1px; }
-  .callout p { font-size: 0.74rem; color: var(--muted); }
-
-  /* Tabs */
-  .tabs-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 8px;
-  }
-  .tabs { display: flex; gap: 6px; }
-  .tab-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--muted);
-    padding: 6px 12px;
+    padding: 11px 15px;
     border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
   }
-  .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); border-color: transparent; }
-  .tab-btn.active {
-    background: var(--gold-dim);
-    color: var(--gold);
-    border-color: rgba(250, 204, 21, 0.35);
-  }
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
+  .status-hero.green { border-color: rgba(34, 197, 94, 0.35); background: var(--green-dim); }
+  .status-hero.red { border-color: rgba(239, 68, 68, 0.4); background: var(--red-dim); }
+  .status-hero.yellow { border-color: rgba(251, 146, 60, 0.4); background: var(--amber-dim); }
+  .status-hero-left { display: flex; align-items: center; gap: 11px; }
+  .status-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .status-hero.green .status-dot { background: var(--green); }
+  .status-hero.red .status-dot { background: var(--red); }
+  .status-hero.yellow .status-dot { background: var(--amber); }
+  .status-hero h3 { font-size: 0.88rem; font-weight: 600; margin-bottom: 1px; }
+  .status-hero p { font-size: 0.75rem; color: var(--muted); }
 
-  .mode-hint {
-    font-size: 0.74rem;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* Sheriff Preset Gallery */
-  .presets-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 4px;
-  }
   .preview-bar {
     height: 18px;
     line-height: 18px;
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     font-weight: 600;
-    color: var(--cyan);
+    color: var(--accent);
     margin-bottom: 6px;
     white-space: nowrap;
     overflow: hidden;
@@ -167,152 +279,68 @@
     opacity: 0;
     transition: opacity 0.12s ease;
   }
-  @media (max-width: 760px) { .presets-grid { grid-template-columns: repeat(2, 1fr); } }
 
-  .preset-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    overflow: hidden;
-    cursor: pointer;
-    transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
-  .preset-card:hover {
-    border-color: rgba(56, 189, 248, 0.75);
-    background: #141d2e;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  }
-  .preset-card.active {
-    border-color: var(--gold);
-    box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.35), 0 6px 18px rgba(250, 204, 21, 0.1);
-  }
-  .preset-art {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    background: radial-gradient(circle at 50% 42%, #152038 0%, #090d16 85%);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .preset-art svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-  .preset-art::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(180deg, transparent 62%, rgba(17, 24, 39, 0.85) 100%);
-  }
-  .preset-badge {
-    position: absolute;
-    top: 7px;
-    right: 7px;
-    z-index: 2;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 999px;
-    background: rgba(11, 15, 25, 0.85);
-    border: 1px solid rgba(255,255,255,0.14);
-    color: var(--muted);
-  }
-  .preset-card.active .preset-badge {
-    background: var(--gold);
-    color: #0f172a;
-    border-color: var(--gold);
-  }
-  .preset-meta {
-    padding: 8px 10px 10px;
-    background: var(--panel);
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-  }
-  .preset-meta h4 {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 2px;
-  }
-  .preset-card.active .preset-meta h4 { color: var(--gold); }
-  .preset-meta p {
-    font-size: 0.7rem;
-    color: var(--muted);
-    line-height: 1.3;
-  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 
-  /* Granular Controls Grid */
+  /* Dual-Pane Settings Cards (Windows 11 Settings style) */
   .controls-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
-  @media (max-width: 760px) { .controls-grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 820px) { .controls-grid { grid-template-columns: minmax(0, 1fr); } }
 
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 11px;
-    padding: 10px 12px;
+    border-radius: 8px;
+    padding: 14px 16px;
     min-width: 0;
   }
-  .card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-  }
+  .card-head { margin-bottom: 10px; }
   .card-head h2 {
-    font-size: 0.86rem;
-    font-weight: 700;
+    font-size: 0.96rem;
+    font-weight: 600;
     color: var(--text);
-    letter-spacing: -0.01em;
+    margin-bottom: 2px;
   }
   .card-sub {
-    font-size: 0.71rem;
+    font-size: 0.75rem;
     color: var(--muted);
+    display: block;
   }
 
   .setting-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 5px 6px;
+    gap: 12px;
+    padding: 9px 6px;
     margin: 0 -6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-    transition: background 0.14s ease;
+    border-top: 1px solid var(--divider);
+    border-radius: 5px;
+    transition: background 0.12s ease;
   }
   .setting-row:first-of-type { border-top: none; }
   .setting-row.preview-diff {
-    background: rgba(56, 189, 248, 0.10);
-    box-shadow: inset 2px 0 0 var(--cyan);
+    background: var(--accent-dim);
+    box-shadow: inset 2px 0 0 var(--accent);
   }
   .setting-info { flex: 1; min-width: 0; }
   .setting-info h4 {
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.85rem;
+    font-weight: 400;
     display: flex;
     align-items: center;
     gap: 6px;
-    flex-wrap: nowrap;
     white-space: nowrap;
     overflow: hidden;
     line-height: 1.35;
   }
   .setting-info p {
-    font-size: 0.7rem;
+    font-size: 0.73rem;
     color: var(--muted);
     white-space: nowrap;
     overflow: hidden;
@@ -322,75 +350,85 @@
     font-size: 0.64rem;
     padding: 1px 5px;
     border-radius: 4px;
-    background: rgba(255,255,255,0.06);
+    background: var(--nav-hover);
     color: var(--muted);
     font-weight: 600;
   }
   .live-tag.on { color: var(--green); background: var(--green-dim); }
-  .live-tag.off { color: var(--muted); }
   .preview-tag {
-    font-size: 0.65rem;
+    font-size: 0.66rem;
     padding: 0 6px;
     line-height: 1.45;
     border-radius: 4px;
-    background: var(--cyan-dim);
-    color: var(--cyan);
-    border: 1px solid rgba(56, 189, 248, 0.35);
-    font-weight: 700;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
     white-space: nowrap;
     flex-shrink: 0;
     display: none;
   }
   .setting-row.preview-diff .preview-tag { display: inline-block; }
 
-  /* Switch */
-  .switch { position: relative; width: 38px; height: 21px; flex-shrink: 0; }
+  .switch-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .switch-state {
+    font-size: 0.78rem;
+    color: var(--text);
+    min-width: 22px;
+    text-align: right;
+  }
+  .switch { position: relative; width: 40px; height: 20px; flex-shrink: 0; }
   .switch input { opacity: 0; width: 0; height: 0; }
   .slider {
     position: absolute; cursor: pointer;
     top: 0; left: 0; right: 0; bottom: 0;
-    background-color: #334155;
-    transition: .18s;
-    border-radius: 21px;
+    background-color: transparent;
+    border: 1px solid var(--switch-off-border);
+    transition: .16s;
+    border-radius: 20px;
   }
   .slider:before {
     position: absolute; content: "";
-    height: 15px; width: 15px;
-    left: 3px; bottom: 3px;
-    background-color: white;
-    transition: .18s;
+    height: 12px; width: 12px;
+    left: 3px; top: 3px;
+    background-color: var(--switch-off-dot);
+    transition: .16s;
     border-radius: 50%;
   }
-  input:checked + .slider { background-color: var(--gold); }
-  input:checked + .slider:before { transform: translateX(17px); background-color: #0f172a; }
+  input:checked + .slider { background-color: var(--accent); border-color: var(--accent); }
+  input:checked + .slider:before { transform: translateX(20px); background-color: var(--accent-fg); }
 
   select, input[type="text"] {
     background: var(--panel-alt);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 0.75rem;
+    border-radius: 5px;
+    padding: 5px 9px;
+    font-size: 0.77rem;
     font-family: inherit;
   }
-  select { max-width: 158px; }
+  select { max-width: 145px; }
 
   /* Watchlist Bar */
   .watch-bar {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 9px 14px;
+    border-radius: 8px;
+    padding: 10px 16px;
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
   }
   .watch-bar.preview-diff {
-    border-color: var(--cyan);
-    background: rgba(56, 189, 248, 0.08);
+    border-color: var(--accent);
+    background: var(--accent-dim);
   }
-  .watch-bar label { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .watch-bar label { font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
   .watch-bar input[type="text"] { flex: 1; min-width: 200px; }
 
   /* Operations Tab */
@@ -399,8 +437,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
-  @media (max-width: 760px) { .ops-grid { grid-template-columns: 1fr; } }
-
+  @media (max-width: 820px) { .ops-grid { grid-template-columns: 1fr; } }
   .btn-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
 
   .kv-grid {
@@ -410,277 +447,419 @@
     margin-bottom: 10px;
   }
   .kv-box {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 7px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     padding: 6px 9px;
   }
-  .kv-box span { display: block; font-size: 0.66rem; color: var(--muted); }
-  .kv-box strong { font-size: 0.78rem; }
+  .kv-box span { display: block; font-size: 0.68rem; color: var(--muted); }
+  .kv-box strong { font-size: 0.79rem; font-weight: 600; }
 
   .audit-list {
-    max-height: 220px;
+    max-height: 230px;
     overflow-y: auto;
     font-family: "Cascadia Code", Consolas, monospace;
     font-size: 0.7rem;
-    background: #080b12;
+    background: var(--audit-bg);
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: 6px;
     padding: 8px;
   }
-  .audit-item { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); color: #cbd5e1; }
+  .audit-item { padding: 3px 0; border-bottom: 1px solid var(--divider); color: var(--audit-text); }
   .audit-item .ts { color: var(--muted); margin-right: 6px; }
-  .audit-item .cat { color: var(--gold); font-weight: 700; margin-right: 6px; }
+  .audit-item .cat { color: var(--accent); font-weight: 700; margin-right: 6px; }
 
   #toast {
     position: fixed;
     bottom: 16px;
     right: 18px;
-    background: #1e293b;
-    border: 1px solid var(--gold);
+    background: var(--panel);
+    border: 1px solid var(--accent);
     color: var(--text);
     padding: 9px 14px;
-    border-radius: 9px;
+    border-radius: 8px;
     font-size: 0.78rem;
     font-weight: 600;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35);
     display: none;
     z-index: 1000;
   }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 950;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+  }
+  .modal-card h2 { font-size: 1.02rem; font-weight: 600; margin-bottom: 8px; }
+  .modal-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.45; margin-bottom: 14px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <div class="brand">
+<div class="shell">
+  <!-- Left Sidebar (Windows 11 Settings style) -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
       <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ShieldSheriff Logo">
-        <!-- Outer Shield -->
-        <path d="M10 13 L32 6 L54 13 V33 C54 47 43 55 32 59 C21 55 10 47 10 33 Z" fill="#0F172A" stroke="#FACC15" stroke-width="2.4" stroke-linejoin="round"/>
-        <!-- Sheriff Shoulders & Star Badge -->
-        <path d="M19 48 C21 41 26 39 32 39 C38 39 43 41 45 48" fill="#1E293B" stroke="#64748B" stroke-width="1.5" stroke-linecap="round"/>
-        <polygon points="32,42 33.6,46 38,46 34.5,48.5 35.8,52.5 32,50 28.2,52.5 29.5,48.5 26,46 30.4,46" fill="#FACC15"/>
-        <!-- Head -->
-        <circle cx="32" cy="30" r="8" fill="#0F172A" stroke="#94A3B8" stroke-width="1.5"/>
-        <!-- Earmuffs (Zero Nags) -->
-        <rect x="20.5" y="26" width="4" height="8" rx="2" fill="#38BDF8" stroke="#0F172A" stroke-width="1"/>
-        <rect x="39.5" y="26" width="4" height="8" rx="2" fill="#38BDF8" stroke="#0F172A" stroke-width="1"/>
-        <!-- Blindfold (Zero Telemetry) -->
-        <rect x="23.5" y="27.2" width="17" height="4.4" rx="1.6" fill="#38BDF8" stroke="#0F172A" stroke-width="0.9"/>
-        <path d="M40.5 29 L46 27.5 M40.5 30 L45.5 32" stroke="#38BDF8" stroke-width="1.4" stroke-linecap="round"/>
-        <!-- Stetson Hat -->
-        <path d="M22 23 L25 13 Q32 15.5 39 13 L42 23 Z" fill="#1E293B" stroke="#FACC15" stroke-width="1.6" stroke-linejoin="round"/>
-        <ellipse cx="32" cy="23.5" rx="15" ry="3" fill="#1E293B" stroke="#FACC15" stroke-width="1.6"/>
+        <defs>
+          <linearGradient id="shieldBg" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#1E293B"/>
+            <stop offset="100%" stop-color="#0F172A"/>
+          </linearGradient>
+        </defs>
+        <path d="M12 14 L32 7 L52 14 V31 C52 45 42 54 32 58 C22 54 12 45 12 31 Z" fill="url(#shieldBg)" stroke="#FACC15" stroke-width="2.8" stroke-linejoin="round"/>
+        <g transform="rotate(-7 32 33)">
+          <path d="M17 37 C17 31 22 28.5 27 29.5 L41.5 30.5 C46 30 48.5 32.5 47.5 35.5 C46.5 38 40.5 37 35.5 40.5 C30.5 44 22.5 46.5 18.5 43.5 C16.8 42 16.8 39.5 17 37 Z" fill="#FACC15"/>
+          <path d="M23.5 33 L25 22.5 C26 19.5 38 18.5 40 21.5 L42 32.5 Z" fill="#FACC15"/>
+          <path d="M22.5 33.5 Q32 33 42.5 31.5" stroke="#0F172A" stroke-width="1.9" stroke-linecap="round"/>
+          <path d="M20 42.2 Q29 41.2 37 36.2 Q42 33.4 46 34.2" stroke="#0F172A" stroke-width="1.7" stroke-linecap="round"/>
+          <path d="M26.5 23.8 Q32 24.8 38.5 21.8" stroke="#0F172A" stroke-width="1.7" stroke-linecap="round"/>
+          <path d="M34.5 24.8 Q32.5 27.6 36.5 29" stroke="#0F172A" stroke-width="1.6" stroke-linecap="round"/>
+        </g>
       </svg>
       <div>
-        <h1>ShieldSheriff <span class="pill gold" id="versionBadge">v2026.11.1</span> <span class="pill gold" id="complianceBadge">Inspecting...</span></h1>
-        <p>Granular Standing Orders for Windows Defender</p>
+        <h2>ShieldSheriff</h2>
+        <p><span id="versionBadge">v2026.11.3</span> · <span id="sidebarStatus">Active</span></p>
       </div>
     </div>
-    <div class="header-right">
-      <span class="pill" id="elevationBadge">Checking...</span>
-      <button class="warn" id="btnElevate" style="display:none" onclick="elevateApp()">&#9889; Admin</button>
-      <button onclick="enforceNow()" class="primary">Enforce Orders</button>
-    </div>
-  </header>
 
-  <div class="callout amber" id="tamperBanner">
-    <div>
-      <h3>One-Time Tamper Protection Handoff Needed</h3>
-      <p>Defender's Tamper Protection is ON, blocking policy locks. Flip it OFF once in Windows Security.</p>
-    </div>
-    <button class="warn" onclick="apiCall('/api/open-winsec')">Open Windows Security</button>
-  </div>
+    <div class="nav-group-label">Presets</div>
+    <div id="sidebarPresets"></div>
 
-  <div class="callout cyan" id="standDownBanner">
-    <div>
-      <h3 id="standDownTitle">Deputy Standing Down</h3>
-      <p>Real-Time Protection is temporarily paused and will restore automatically.</p>
+    <div class="nav-sep"></div>
+    <div class="nav-item" id="navControls" onclick="switchTab('orders')">
+      <span class="nav-icon" style="background: rgba(96, 165, 250, 0.18); color: #60a5fa;">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 4.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0 3.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 2 8zm0 3.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/></svg>
+      </span>
+      <span class="nav-item-text">All Controls</span>
     </div>
-    <button onclick="standDown(0)">Resume Now</button>
-  </div>
+    <div class="nav-item" id="navOps" onclick="switchTab('ops')">
+      <span class="nav-icon" style="background: rgba(161, 161, 170, 0.2); color: #a1a1aa;">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg>
+      </span>
+      <span class="nav-item-text">Settings</span>
+    </div>
+    <div class="nav-item" id="navLogs" style="padding-left: 24px;" onclick="switchTab('logs')">
+      <span class="nav-icon" style="background: rgba(161, 161, 170, 0.14); color: #a1a1aa;">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2.5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2.5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H5z"/><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H4z"/></svg>
+      </span>
+      <span class="nav-item-text">Logs</span>
+    </div>
+  </aside>
 
-  <!-- Navigation Tabs -->
-  <div class="tabs-bar">
-    <div class="tabs">
-      <button class="tab-btn active" id="tabBtnOrders" onclick="switchTab('orders')">&#9733; Sheriff Presets &amp; Controls</button>
-      <button class="tab-btn" id="tabBtnOps" onclick="switchTab('ops')">&#9889; Operations, Stand-Down &amp; Audit</button>
+  <!-- Right Main Content -->
+  <main class="main-pane">
+    <div class="page-head">
+      <div class="page-title-wrap">
+        <h1 id="pageTitle">Protection &amp; Controls</h1>
+        <span id="presetModeBadge" class="pill accent">Not Configured</span>
+      </div>
+      <div class="header-actions">
+        <span class="pill" id="elevationBadge">Checking...</span>
+        <button class="warn" id="btnElevate" style="display:none" onclick="elevateApp()">Admin</button>
+        <button id="btnApplyNow" onclick="applyChanges()" class="primary">Apply Now</button>
+      </div>
     </div>
-    <div class="mode-hint">
-      <span id="presetModeBadge" class="pill gold">Preset: —</span>
-    </div>
-  </div>
 
-  <!-- TAB 1: Presets + Granular Controls -->
-  <div class="tab-panel active" id="tabOrders">
-    <div class="presets-grid" id="presetsGrid"></div>
+    <div class="status-hero green" id="statusHero">
+      <div class="status-hero-left">
+        <span class="status-dot"></span>
+        <div>
+          <h3 id="statusHeroTitle">Checking protection status...</h3>
+          <p id="statusHeroDesc">Inspecting Windows Defender configuration</p>
+        </div>
+      </div>
+      <div id="statusHeroAction"></div>
+    </div>
+
     <div class="preview-bar" id="hoverPreviewHint">&nbsp;</div>
 
-    <div class="controls-grid">
-      <!-- Left Card: Local Deputy Engines -->
-      <div class="card">
-        <div class="card-head">
-          <h2>Deputy Engines</h2>
-          <span class="card-sub">Local scanning hooks</span>
-        </div>
-
-        <div class="setting-row" id="rowRealtime">
-          <div class="setting-info">
-            <h4>Real-Time File Protection <span class="live-tag" id="liveRtpTag"></span> <span class="preview-tag" id="prevRtp"></span></h4>
-            <p>On-access file scanning (on-demand scans still work when OFF)</p>
-          </div>
-          <label class="switch"><input type="checkbox" id="chkRealtime" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
-        </div>
-
-        <div class="setting-row" id="rowBehavior">
-          <div class="setting-info">
-            <h4>Behavior Monitoring <span class="live-tag" id="liveBmTag"></span> <span class="preview-tag" id="prevBm"></span></h4>
-            <p>Heuristic process behavior monitoring</p>
-          </div>
-          <label class="switch"><input type="checkbox" id="chkBehavior" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
-        </div>
-
-        <div class="setting-row" id="rowIOAV">
-          <div class="setting-info">
-            <h4>Downloads &amp; Attachments (IOAV) <span class="live-tag" id="liveIoavTag"></span> <span class="preview-tag" id="prevIoav"></span></h4>
-            <p>Scans browser &amp; email downloads (Mark-of-the-Web)</p>
-          </div>
-          <label class="switch"><input type="checkbox" id="chkIOAV" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
-        </div>
-
-        <div class="setting-row" id="rowScript">
-          <div class="setting-info">
-            <h4>Script Scanning (AMSI) <span class="live-tag" id="liveScriptTag"></span> <span class="preview-tag" id="prevScript"></span></h4>
-            <p>Scans PowerShell, JS &amp; VBScript execution</p>
-          </div>
-          <label class="switch"><input type="checkbox" id="chkScript" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
-        </div>
-
-        <div class="setting-row" id="rowNetwork">
-          <div class="setting-info">
-            <h4>Network Protection <span class="live-tag" id="liveNetTag"></span> <span class="preview-tag" id="prevNet"></span></h4>
-            <p>Exploit Guard outbound domain blocking</p>
-          </div>
-          <select id="selNetwork" onchange="saveOrdersFromUI()">
-            <option value="0">OFF (0)</option>
-            <option value="1">Block (1)</option>
-            <option value="2">Audit (2)</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Right Card: Cloud, Telemetry & Nags -->
-      <div class="card">
-        <div class="card-head">
-          <h2>Privacy, Cloud &amp; Nags</h2>
-          <span class="card-sub">Telemetry &amp; Windows Security UI</span>
-        </div>
-
-        <div class="setting-row" id="rowCloud">
-          <div class="setting-info">
-            <h4>Cloud Protection (MAPS) <span class="live-tag" id="liveCloudTag"></span> <span class="preview-tag" id="prevCloud"></span></h4>
-            <p>File metadata lookup to Microsoft servers</p>
-          </div>
-          <select id="selCloud" onchange="saveOrdersFromUI()">
-            <option value="0">OFF (0)</option>
-            <option value="1">Basic (1)</option>
-            <option value="2">Adv (2)</option>
-          </select>
-        </div>
-
-        <div class="setting-row" id="rowSamples">
-          <div class="setting-info">
-            <h4>Sample Submission <span class="live-tag" id="liveSamplesTag"></span> <span class="preview-tag" id="prevSamples"></span></h4>
-            <p>Automatic file uploads to Microsoft</p>
-          </div>
-          <select id="selSamples" onchange="saveOrdersFromUI()">
-            <option value="2">Never Send (2)</option>
-            <option value="0">Prompt (0)</option>
-            <option value="1">Safe Only (1)</option>
-            <option value="3">Send All (3)</option>
-          </select>
-        </div>
-
-        <div class="setting-row" id="rowNags">
-          <div class="setting-info">
-            <h4>Silence Security Nags <span class="live-tag" id="liveNagTag"></span> <span class="preview-tag" id="prevNags"></span></h4>
-            <p>Suppress Windows 11 "Action Needed" toast alerts</p>
-          </div>
-          <label class="switch"><input type="checkbox" id="chkSuppressAllNags" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
-        </div>
-
-        <div class="setting-row" id="rowTray">
-          <div class="setting-info">
-            <h4>Mute Windows Tray Icon <span class="live-tag" id="liveTrayTag"></span> <span class="preview-tag" id="prevTray"></span></h4>
-            <p>Hide SecurityHealthSystray.exe (keep Sheriff star)</p>
-          </div>
-          <label class="switch"><input type="checkbox" id="chkMuteSystray" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Compact Auto Stand-Down Watchlist Bar -->
-    <div class="watch-bar" id="rowWatch">
-      <label for="txtWatchProcs">Auto Stand-Down Watchlist <span class="preview-tag" id="prevWatch"></span></label>
-      <input type="text" id="txtWatchProcs" placeholder="e.g. cargo.exe, msbuild.exe, link.exe, rustc.exe (pauses Real-Time while running)">
-      <button onclick="saveOrdersFromUI()">Save Watchlist</button>
-    </div>
-  </div>
-
-  <!-- TAB 2: Operations, Stand-Down & Audit -->
-  <div class="tab-panel" id="tabOps">
-    <div class="ops-grid">
-      <div>
-        <div class="card" style="margin-bottom: 12px;">
+    <!-- TAB 1: Dual-Pane Controls -->
+    <div class="tab-panel active" id="tabOrders">
+      <div class="controls-grid">
+        <!-- Left Card: Protection Engines -->
+        <div class="card">
           <div class="card-head">
-            <h2>Deputy Stand-Down</h2>
-            <span class="card-sub">Temporary Real-Time pause</span>
+            <h2>Protection Engines</h2>
+            <span class="card-sub">Local Windows Defender scanning hooks</span>
           </div>
-          <div class="btn-row">
-            <button onclick="standDown(15)">Pause 15m</button>
-            <button onclick="standDown(30)">Pause 30m</button>
-            <button onclick="standDown(60)">Pause 1h</button>
-            <button onclick="standDown(240)">Pause 4h</button>
-            <button class="primary" onclick="standDown(0)">Resume Now</button>
+
+          <div class="setting-row" id="rowRealtime">
+            <div class="setting-info">
+              <h4>Real-Time File Protection <span class="live-tag" id="liveRtpTag"></span> <span class="preview-tag" id="prevRtp"></span></h4>
+              <p>On-access file scanning (manual scans stay available)</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateRtp">On</span>
+              <label class="switch"><input type="checkbox" id="chkRealtime" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="setting-row" id="rowBehavior">
+            <div class="setting-info">
+              <h4>Behavior Monitoring <span class="live-tag" id="liveBmTag"></span> <span class="preview-tag" id="prevBm"></span></h4>
+              <p>Heuristic process behavior monitoring</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateBm">On</span>
+              <label class="switch"><input type="checkbox" id="chkBehavior" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="setting-row" id="rowIOAV">
+            <div class="setting-info">
+              <h4>Downloads &amp; Attachments <span class="live-tag" id="liveIoavTag"></span> <span class="preview-tag" id="prevIoav"></span></h4>
+              <p>Scans browser &amp; email downloads (IOAV)</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateIoav">On</span>
+              <label class="switch"><input type="checkbox" id="chkIOAV" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="setting-row" id="rowScript">
+            <div class="setting-info">
+              <h4>Script Scanning (AMSI) <span class="live-tag" id="liveScriptTag"></span> <span class="preview-tag" id="prevScript"></span></h4>
+              <p>Scans PowerShell, JS &amp; VBScript execution</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateScript">On</span>
+              <label class="switch"><input type="checkbox" id="chkScript" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="setting-row" id="rowNetwork">
+            <div class="setting-info">
+              <h4>Network Protection <span class="live-tag" id="liveNetTag"></span> <span class="preview-tag" id="prevNet"></span></h4>
+              <p>Exploit Guard outbound domain blocking</p>
+            </div>
+            <select id="selNetwork" onchange="saveOrdersFromUI()">
+              <option value="0">OFF (0)</option>
+              <option value="1">Block (1)</option>
+              <option value="2">Audit (2)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Right Card: Privacy, Cloud & Nags -->
+        <div class="card">
+          <div class="card-head">
+            <h2>Privacy, Cloud &amp; Notifications</h2>
+            <span class="card-sub">Telemetry &amp; Windows Security UI behavior</span>
+          </div>
+
+          <div class="setting-row" id="rowCloud">
+            <div class="setting-info">
+              <h4>Cloud Protection (MAPS) <span class="live-tag" id="liveCloudTag"></span> <span class="preview-tag" id="prevCloud"></span></h4>
+              <p>File metadata lookup to Microsoft servers</p>
+            </div>
+            <select id="selCloud" onchange="saveOrdersFromUI()">
+              <option value="0">OFF (0)</option>
+              <option value="1">Basic (1)</option>
+              <option value="2">Adv (2)</option>
+            </select>
+          </div>
+
+          <div class="setting-row" id="rowSamples">
+            <div class="setting-info">
+              <h4>Sample Submission <span class="live-tag" id="liveSamplesTag"></span> <span class="preview-tag" id="prevSamples"></span></h4>
+              <p>Automatic file uploads to Microsoft</p>
+            </div>
+            <select id="selSamples" onchange="saveOrdersFromUI()">
+              <option value="2">Never Send (2)</option>
+              <option value="0">Prompt (0)</option>
+              <option value="1">Safe Only (1)</option>
+              <option value="3">Send All (3)</option>
+            </select>
+          </div>
+
+          <div class="setting-row" id="rowNags">
+            <div class="setting-info">
+              <h4>Silence Security Nags <span class="live-tag" id="liveNagTag"></span> <span class="preview-tag" id="prevNags"></span></h4>
+              <p>Suppress Windows 11 "Action Needed" alerts</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateNags">On</span>
+              <label class="switch"><input type="checkbox" id="chkSuppressAllNags" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="setting-row" id="rowTray">
+            <div class="setting-info">
+              <h4>Hide Windows Tray Icon <span class="live-tag" id="liveTrayTag"></span> <span class="preview-tag" id="prevTray"></span></h4>
+              <p>Hide SecurityHealthSystray.exe</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateTray">Off</span>
+              <label class="switch"><input type="checkbox" id="chkMuteSystray" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="watch-bar" id="rowWatch">
+        <label for="txtWatchProcs">Auto-Pause Watchlist <span class="preview-tag" id="prevWatch"></span></label>
+        <input type="text" id="txtWatchProcs" oninput="stageOrdersFromUI(true)" placeholder="e.g. cargo.exe, msbuild.exe, link.exe, rustc.exe (pauses Real-Time while running)">
+        <button onclick="applyChanges()">Save Watchlist</button>
+      </div>
+    </div>
+
+    <!-- TAB 2: Settings -->
+    <div class="tab-panel" id="tabOps">
+      <div class="ops-grid">
+        <div>
+          <div class="card" style="margin-bottom: 12px;">
+            <div class="card-head">
+              <h2>Pause Protection</h2>
+              <span class="card-sub">Temporary Real-Time Protection pause</span>
+            </div>
+            <div class="btn-row">
+              <button onclick="standDown(15)">Pause 15m</button>
+              <button onclick="standDown(30)">Pause 30m</button>
+              <button onclick="standDown(60)">Pause 1h</button>
+              <button onclick="standDown(240)">Pause 4h</button>
+              <button class="primary" onclick="standDown(0)">Resume Now</button>
+              <button onclick="enterPassiveMode()">Passive Mode</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Tools &amp; Service</h2>
+              <span class="card-sub">On-demand scans, Defender UI &amp; SYSTEM service</span>
+            </div>
+            <div class="btn-row" style="margin-bottom: 10px;">
+              <button onclick="apiCall('/api/quick-scan')">Quick Scan</button>
+              <button onclick="apiCall('/api/update-sigs')">Update Signatures</button>
+              <button onclick="apiCall('/api/open-winsec')">Windows Security UI</button>
+              <button onclick="apiCall('/api/check-updates')">Check for Updates</button>
+            </div>
+            <div class="btn-row">
+              <button onclick="apiCall('/api/service-install')">Install SYSTEM Service</button>
+              <button onclick="apiCall('/api/service-uninstall')">Remove Service</button>
+            </div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
-            <h2>Operations &amp; 24/7 Service</h2>
-            <span class="card-sub">Manual scans &amp; drift guard</span>
-          </div>
-          <div class="btn-row" style="margin-bottom: 10px;">
-            <button onclick="apiCall('/api/quick-scan')">Quick Scan</button>
-            <button onclick="apiCall('/api/update-sigs')">Update Signatures</button>
-            <button onclick="apiCall('/api/open-winsec')">Windows Security UI</button>
+            <h2>Startup, Auto-Heal &amp; Updates</h2>
+            <span class="card-sub">Background behavior, drift interval &amp; updates</span>
           </div>
           <div class="setting-row">
             <div class="setting-info">
-              <h4>Auto-Heal Windows Update Drift</h4>
-              <p>Verify and restore Standing Orders every 5 seconds</p>
+              <h4>Run at Windows Startup</h4>
+              <p>Launch ShieldSheriff in the system tray at logon</p>
             </div>
-            <label class="switch"><input type="checkbox" id="chkEnforceLoop" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateStartup">Off</span>
+              <label class="switch"><input type="checkbox" id="chkStartupEnabled" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
           </div>
-          <div class="btn-row">
-            <button onclick="apiCall('/api/service-install')">Install SYSTEM Service</button>
-            <button onclick="apiCall('/api/service-uninstall')">Remove Service</button>
+          <div class="setting-row">
+            <div class="setting-info">
+              <h4>Auto-Heal Configuration Drift</h4>
+              <p>Periodically verify and restore your settings</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateLoop">On</span>
+              <label class="switch"><input type="checkbox" id="chkEnforceLoop" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <h4>Auto-Heal Check Interval</h4>
+              <p>How often to inspect for Windows Update or Defender drift</p>
+            </div>
+            <select id="selDriftInterval" onchange="saveOrdersFromUI()">
+              <option value="10">10 seconds</option>
+              <option value="15">15 seconds</option>
+              <option value="30">30 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="300">5 minutes</option>
+              <option value="900">15 minutes</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <h4>Check for Updates on Startup</h4>
+              <p id="updateStatusText">Check GitHub releases when ShieldSheriff starts</p>
+            </div>
+            <div class="switch-wrap">
+              <span class="switch-state" id="stateUpdates">Off</span>
+              <label class="switch"><input type="checkbox" id="chkCheckUpdates" onchange="saveOrdersFromUI()"><span class="slider"></span></label>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
+    <!-- TAB 3: Logs -->
+    <div class="tab-panel" id="tabLogs">
       <div class="card">
         <div class="card-head">
           <h2>Telemetry &amp; Audit Log</h2>
-          <span class="card-sub" id="cfgPathLabel">standing_orders.json</span>
+          <span class="card-sub" id="cfgPathLabel">config.json</span>
         </div>
         <div class="kv-grid">
-          <div class="kv-box"><span>Tamper Protection</span><strong id="kvTamper">—</strong></div>
-          <div class="kv-box"><span>Defender Service</span><strong id="kvService">—</strong></div>
-          <div class="kv-box"><span>Platform Version</span><strong id="kvPlatform">—</strong></div>
-          <div class="kv-box"><span>Signature Version</span><strong id="kvSig">—</strong></div>
+          <div class="kv-box"><span>Tamper Protection</span><strong id="kvTamper">-</strong></div>
+          <div class="kv-box"><span>Defender Service</span><strong id="kvService">-</strong></div>
+          <div class="kv-box"><span>Platform Version</span><strong id="kvPlatform">-</strong></div>
+          <div class="kv-box"><span>Signature Version</span><strong id="kvSig">-</strong></div>
         </div>
-        <div class="audit-list" id="auditList"></div>
+        <div class="audit-list" id="auditList" style="max-height: 360px;"></div>
       </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="autoHealModal" role="dialog" aria-modal="true" aria-labelledby="autoHealTitle">
+  <div class="modal-card">
+    <h2 id="autoHealTitle">Finish Initial Setup</h2>
+    <p>
+      Windows updates or Defender resets can revert your settings (such as re-enabling Real-Time Protection after 24 hours). Choose how ShieldSheriff should run going forward:
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;cursor:pointer;">
+        <input type="checkbox" id="chkConsentStartup" style="accent-color:var(--accent);width:15px;height:15px;">
+        <span>Run ShieldSheriff in the system tray at Windows startup</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;cursor:pointer;">
+        <input type="checkbox" id="chkConsentAutoHeal" checked style="accent-color:var(--accent);width:15px;height:15px;">
+        <span>Auto-heal configuration drift every</span>
+        <select id="selConsentInterval" style="padding:2px 6px;font-size:0.76rem;">
+          <option value="10">10 seconds</option>
+          <option value="15" selected>15 seconds</option>
+          <option value="30">30 seconds</option>
+          <option value="60">1 minute</option>
+          <option value="300">5 minutes</option>
+          <option value="900">15 minutes</option>
+        </select>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;cursor:pointer;">
+        <input type="checkbox" id="chkConsentUpdates" style="accent-color:var(--accent);width:15px;height:15px;">
+        <span>Check for ShieldSheriff updates on startup</span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button onclick="closeAutoHealModal()">Cancel</button>
+      <button class="primary" onclick="finishFirstRunApply()">Apply &amp; Save</button>
     </div>
   </div>
 </div>
@@ -689,13 +868,35 @@
 
 <script>
 let currentState = null;
+let stagedOrders = null;
 let hoveredPresetId = null;
+let activeTab = 'orders';
 
 const PRESET_META = {
-  "quiet-guardian":     { title: "Quiet Guardian",        tag: "Recommended", blurb: "Local ON • Cloud OFF • Nags Silenced" },
-  "dev-workstation":    { title: "Developer Workstation", tag: "Fast Builds", blurb: "Hooks OFF • Auto-Pause on Compilers" },
-  "on-demand-only":     { title: "On-Demand Deputy",      tag: "Zero CPU",    blurb: "Real-Time OFF • Manual CLI Scans ON" },
-  "full-shield-no-nag": { title: "Full Shield",           tag: "Max Guard",   blurb: "All Engines + Cloud • No Uploads/Nags" }
+  "on-demand-only": {
+    title: "On-Demand Only",
+    bg: "rgba(248, 113, 113, 0.18)",
+    fg: "#f87171",
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2zM5.2 7.25a.75.75 0 0 0 0 1.5h5.6a.75.75 0 0 0 0-1.5H5.2z"/></svg>`
+  },
+  "dev-workstation": {
+    title: "Developer Workstation",
+    bg: "rgba(96, 205, 255, 0.18)",
+    fg: "#60cdff",
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2z"/><path d="M6.6 6.1L4.7 8l1.9 1.9M9.4 6.1L11.3 8l-1.9 1.9" fill="none" stroke="#18181b" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  },
+  "quiet-guardian": {
+    title: "Quiet Guardian",
+    bg: "rgba(56, 189, 248, 0.18)",
+    fg: "#38bdf8",
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2z"/></svg>`
+  },
+  "full-shield-no-nag": {
+    title: "Full Shield",
+    bg: "rgba(74, 222, 128, 0.18)",
+    fg: "#4ade80",
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2zm3.2 5.1-3.7 3.8a.6.6 0 0 1-.85 0L5.1 8.5a.6.6 0 1 1 .85-.85l1.12 1.13 3.28-3.33a.6.6 0 1 1 .85.85z"/></svg>`
+  }
 };
 
 const PRESET_ORDER = [
@@ -705,134 +906,16 @@ const PRESET_ORDER = [
   "full-shield-no-nag"
 ];
 
-// Crisp vector Sheriff character representations per preset
-const PRESET_SVGS = {
-  "quiet-guardian": `<svg viewBox="0 0 180 112" xmlns="http://www.w3.org/2000/svg" aria-label="Quiet Guardian Sheriff (Nags Silenced)">
-    <defs>
-      <radialGradient id="qgGlow" cx="50%" cy="45%" r="48%">
-        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.22"/>
-        <stop offset="100%" stop-color="#090d16" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="180" height="112" fill="url(#qgGlow)"/>
-    <!-- Coat / Shoulders standing at attention -->
-    <path d="M62 106 L67 66 Q90 60 113 66 L118 106 Z" fill="#1e293b" stroke="#64748b" stroke-width="1.6"/>
-    <!-- Gold Sheriff Star -->
-    <polygon points="78,75 80,80 85,80 81,83 82.5,88 78,85 73.5,88 75,83 71,80 76,80" fill="#facc15"/>
-    <!-- Head (drawn before hat so hat brim sits in front) -->
-    <circle cx="90" cy="48" r="11" fill="#0f172a" stroke="#94a3b8" stroke-width="1.6"/>
-    <!-- Eyes -->
-    <circle cx="86" cy="44.5" r="1.4" fill="#38bdf8"/>
-    <circle cx="94" cy="44.5" r="1.4" fill="#38bdf8"/>
-    <!-- Cloth Gag across mouth with side knot & tails -->
-    <path d="M79 49 Q90 51 101 49 L100 56 Q90 58 80 56 Z" fill="#38bdf8" stroke="#0f172a" stroke-width="1"/>
-    <line x1="82" y1="52.5" x2="98" y2="52.5" stroke="#0f172a" stroke-width="1.2" opacity="0.55"/>
-    <circle cx="102" cy="52" r="2.3" fill="#38bdf8" stroke="#0f172a" stroke-width="0.8"/>
-    <path d="M104 51 L109 49 M104 53 L109 56" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round"/>
-    <!-- Stetson Hat (in front of forehead) -->
-    <path d="M72 37 L77 18 Q90 22 103 18 L108 37 Z" fill="#1e293b" stroke="#facc15" stroke-width="1.6"/>
-    <path d="M74 33 H106" stroke="#38bdf8" stroke-width="2"/>
-    <ellipse cx="90" cy="38" rx="28" ry="5.5" fill="#1e293b" stroke="#facc15" stroke-width="1.6"/>
-  </svg>`,
-
-  "dev-workstation": `<svg viewBox="0 0 180 112" xmlns="http://www.w3.org/2000/svg" aria-label="Dev Workstation Meditating Sheriff">
-    <defs>
-      <radialGradient id="dwGlow" cx="50%" cy="50%" r="48%">
-        <stop offset="0%" stop-color="#facc15" stop-opacity="0.18"/>
-        <stop offset="100%" stop-color="#090d16" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="180" height="112" fill="url(#dwGlow)"/>
-    <!-- Zen focus rings -->
-    <circle cx="90" cy="58" r="42" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 4" opacity="0.35"/>
-    <circle cx="90" cy="58" r="32" fill="none" stroke="#facc15" stroke-width="1" opacity="0.25"/>
-    <!-- Torso -->
-    <path d="M74 82 L77 59 Q90 55 103 59 L106 82 Z" fill="#1e293b" stroke="#64748b" stroke-width="1.6"/>
-    <!-- Gold Sheriff Star -->
-    <polygon points="90,63 91.7,67 96,67 92.6,69.5 93.8,73.5 90,71 86.2,73.5 87.4,69.5 84,67 88.3,67" fill="#facc15"/>
-    <!-- Crossed legs (lotus pose) -->
-    <path d="M74 82 Q58 84 62 94 Q75 98 90 92 Q105 98 118 94 Q122 84 106 82" fill="#0f172a" stroke="#64748b" stroke-width="1.8" stroke-linejoin="round"/>
-    <!-- Meditating arms resting on knees -->
-    <path d="M76 63 Q64 76 66 87" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
-    <path d="M104 63 Q116 76 114 87" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="66" cy="87" r="2.5" fill="#facc15"/>
-    <circle cx="114" cy="87" r="2.5" fill="#facc15"/>
-    <!-- Head (drawn before hat) -->
-    <circle cx="90" cy="46" r="10.5" fill="#0f172a" stroke="#94a3b8" stroke-width="1.6"/>
-    <path d="M84 46 Q86.5 48 89 46" fill="none" stroke="#facc15" stroke-width="1.5" stroke-linecap="round"/>
-    <path d="M91 46 Q93.5 48 96 46" fill="none" stroke="#facc15" stroke-width="1.5" stroke-linecap="round"/>
-    <!-- Stetson Hat (in front of forehead) -->
-    <path d="M73 35 L78 17 Q90 21 102 17 L107 35 Z" fill="#1e293b" stroke="#facc15" stroke-width="1.6"/>
-    <ellipse cx="90" cy="36" rx="26" ry="5" fill="#1e293b" stroke="#facc15" stroke-width="1.6"/>
-  </svg>`,
-
-  "on-demand-only": `<svg viewBox="0 0 180 112" xmlns="http://www.w3.org/2000/svg" aria-label="On-Demand Deputy Tied Up">
-    <defs>
-      <radialGradient id="odGlow" cx="50%" cy="48%" r="48%">
-        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18"/>
-        <stop offset="100%" stop-color="#090d16" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="180" height="112" fill="url(#odGlow)"/>
-    <!-- Chair back posts -->
-    <line x1="64" y1="54" x2="64" y2="104" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
-    <line x1="116" y1="54" x2="116" y2="104" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
-    <!-- Torso -->
-    <path d="M70 102 L73 61 Q90 57 107 61 L110 102 Z" fill="#1e293b" stroke="#64748b" stroke-width="1.6"/>
-    <!-- Gold Sheriff Star peeking through ropes -->
-    <polygon points="90,64 91.5,68 95.5,68 92.3,70.5 93.4,74.5 90,72 86.6,74.5 87.7,70.5 84.5,68 88.5,68" fill="#facc15" opacity="0.85"/>
-    <!-- Lasso Rope Coils -->
-    <path d="M68 68 Q90 74 112 68" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
-    <path d="M68 77 Q90 83 112 77" fill="none" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
-    <path d="M69 86 Q90 92 111 86" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
-    <path d="M70 95 Q90 100 110 95" fill="none" stroke="#fbbf24" stroke-width="2.8" stroke-linecap="round"/>
-    <!-- Rope Knot -->
-    <circle cx="114" cy="78" r="4" fill="#f59e0b" stroke="#0f172a" stroke-width="1"/>
-    <path d="M117 81 Q124 89 120 98" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round"/>
-    <!-- Head (drawn before hat) -->
-    <circle cx="90" cy="47" r="10.5" fill="#0f172a" stroke="#94a3b8" stroke-width="1.6"/>
-    <line x1="85" y1="46" x2="88" y2="46" stroke="#f59e0b" stroke-width="1.6" stroke-linecap="round"/>
-    <line x1="92" y1="46" x2="95" y2="46" stroke="#f59e0b" stroke-width="1.6" stroke-linecap="round"/>
-    <!-- Tilted Stetson Hat (in front of forehead) -->
-    <g transform="rotate(-7 90 35)">
-      <path d="M73 36 L78 18 Q90 22 102 18 L107 36 Z" fill="#1e293b" stroke="#f59e0b" stroke-width="1.6"/>
-      <ellipse cx="90" cy="37" rx="26" ry="5" fill="#1e293b" stroke="#f59e0b" stroke-width="1.6"/>
-    </g>
-  </svg>`,
-
-  "full-shield-no-nag": `<svg viewBox="0 0 180 112" xmlns="http://www.w3.org/2000/svg" aria-label="Full Shield Sheriff with Gun and Shield">
-    <defs>
-      <radialGradient id="fsGlow" cx="50%" cy="46%" r="50%">
-        <stop offset="0%" stop-color="#22c55e" stop-opacity="0.22"/>
-        <stop offset="100%" stop-color="#090d16" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="180" height="112" fill="url(#fsGlow)"/>
-    <!-- Body -->
-    <path d="M68 104 L72 60 Q90 55 108 60 L112 104 Z" fill="#1e293b" stroke="#64748b" stroke-width="1.6"/>
-    <!-- Tactical Shield (left) -->
-    <path d="M40 54 L68 48 L68 78 Q68 92 54 100 Q40 92 40 78 Z" fill="#0f172a" stroke="#22c55e" stroke-width="2.2" stroke-linejoin="round"/>
-    <polygon points="54,63 56.2,69 62.5,69 57.4,72.6 59.3,78.5 54,75 48.7,78.5 50.6,72.6 45.5,69 51.8,69" fill="#facc15"/>
-    <!-- Revolver (right) -->
-    <path d="M108 69 L121 69 L124 80 L117 80 L115 73 L108 73" fill="#475569" stroke="#cbd5e1" stroke-width="1.3" stroke-linejoin="round"/>
-    <rect x="118" y="64" width="22" height="5" rx="1.5" fill="#cbd5e1"/>
-    <circle cx="122" cy="69" r="3.5" fill="#facc15" stroke="#0f172a" stroke-width="1"/>
-    <!-- Head (drawn before hat) -->
-    <circle cx="90" cy="46" r="10.5" fill="#0f172a" stroke="#94a3b8" stroke-width="1.6"/>
-    <circle cx="86" cy="45" r="1.5" fill="#22c55e"/>
-    <circle cx="94" cy="45" r="1.5" fill="#22c55e"/>
-    <!-- Stetson Hat (in front of forehead) -->
-    <path d="M73 35 L78 17 Q90 21 102 17 L107 35 Z" fill="#1e293b" stroke="#facc15" stroke-width="1.6"/>
-    <path d="M75 31 H105" stroke="#facc15" stroke-width="1.8"/>
-    <ellipse cx="90" cy="36" rx="27" ry="5" fill="#1e293b" stroke="#facc15" stroke-width="1.6"/>
-  </svg>`
-};
-
 function switchTab(tab) {
-  document.getElementById('tabBtnOrders').classList.toggle('active', tab === 'orders');
-  document.getElementById('tabBtnOps').classList.toggle('active', tab === 'ops');
+  activeTab = tab;
   document.getElementById('tabOrders').classList.toggle('active', tab === 'orders');
   document.getElementById('tabOps').classList.toggle('active', tab === 'ops');
+  document.getElementById('tabLogs').classList.toggle('active', tab === 'logs');
+  const titles = { orders: 'Protection & Controls', ops: 'Settings', logs: 'Logs' };
+  document.getElementById('pageTitle').textContent = titles[tab] || 'ShieldSheriff';
+  document.getElementById('navControls').classList.toggle('active', tab === 'orders' && currentState && (currentState.firstRun || currentState.orders.presetName === 'custom' || currentState.orders.presetName === 'unconfigured'));
+  document.getElementById('navOps').classList.toggle('active', tab === 'ops');
+  document.getElementById('navLogs').classList.toggle('active', tab === 'logs');
 }
 
 function showToast(msg) {
@@ -868,187 +951,249 @@ function renderPresetDiffPreview() {
   const hint = document.getElementById('hoverPreviewHint');
   const clearAll = () => {
     document.querySelectorAll('.preview-diff').forEach(el => el.classList.remove('preview-diff'));
+    document.querySelectorAll('.preview-tag').forEach(el => { el.textContent = ''; });
     hint.style.opacity = '0';
-    hint.innerHTML = '&nbsp;';
   };
+
   if (!hoveredPresetId || !currentState) {
     clearAll();
     return;
   }
-  const preset = (currentState.presets || []).find(p => p.id === hoveredPresetId);
-  if (!preset) { clearAll(); return; }
 
-  const o = currentState.orders;
-  const p = preset.orders;
-  const meta = PRESET_META[preset.id] || { title: preset.name };
+  const preset = (currentState.presets || []).find(p => p.id === hoveredPresetId);
+  if (!preset) {
+    clearAll();
+    return;
+  }
+
+  const cur = stagedOrders || currentState.orders;
+  const tgt = preset.orders;
+  const meta = PRESET_META[hoveredPresetId] || { title: preset.name };
+
+  document.querySelectorAll('.preview-diff').forEach(el => el.classList.remove('preview-diff'));
+  document.querySelectorAll('.preview-tag').forEach(el => { el.textContent = ''; });
+
+  const cloudNames = ['OFF', 'Basic', 'Adv'];
+  const sampleNames = { 0: 'Prompt', 1: 'Safe', 2: 'Never', 3: 'All' };
+  const netNames = { 0: 'OFF', 1: 'Block', 2: 'Audit' };
 
   let diffs = 0;
-  const markBool = (rowId, prevId, curVal, nextVal) => {
-    const row = document.getElementById(rowId);
-    const prev = document.getElementById(prevId);
-    if (Boolean(curVal) !== Boolean(nextVal)) {
-      row.classList.add('preview-diff');
-      prev.textContent = '→ ' + (nextVal ? 'ON' : 'OFF');
-      diffs++;
-    } else {
-      row.classList.remove('preview-diff');
-    }
-  };
-  const markEnum = (rowId, prevId, curVal, nextVal, labels) => {
-    const row = document.getElementById(rowId);
-    const prev = document.getElementById(prevId);
-    if (Number(curVal) !== Number(nextVal)) {
-      row.classList.add('preview-diff');
-      prev.textContent = '→ ' + (labels[nextVal] || nextVal);
-      diffs++;
-    } else {
-      row.classList.remove('preview-diff');
-    }
-  };
-
-  markBool('rowRealtime', 'prevRtp', o.realtimeProtection, p.realtimeProtection);
-  markBool('rowBehavior', 'prevBm', o.behaviorMonitoring, p.behaviorMonitoring);
-  markBool('rowIOAV', 'prevIoav', o.ioavProtection, p.ioavProtection);
-  markBool('rowScript', 'prevScript', o.scriptScanning, p.scriptScanning);
-  markEnum('rowNetwork', 'prevNet', o.networkProtection, p.networkProtection, {0:'OFF', 1:'Block', 2:'Audit'});
-  markEnum('rowCloud', 'prevCloud', o.cloudProtection, p.cloudProtection, {0:'OFF', 1:'Basic', 2:'Adv'});
-  markEnum('rowSamples', 'prevSamples', o.sampleSubmission, p.sampleSubmission, {0:'Prompt', 1:'Safe', 2:'Never', 3:'All'});
-  markBool('rowNags', 'prevNags', o.suppressAllNags, p.suppressAllNags);
-  markBool('rowTray', 'prevTray', o.muteWindowsSecSystray, p.muteWindowsSecSystray);
-
-  const curWatch = (o.autoStandDownProcesses || []).join(', ');
-  const nextWatch = (p.autoStandDownProcesses || []).join(', ');
-  const watchRow = document.getElementById('rowWatch');
-  const prevWatch = document.getElementById('prevWatch');
-  if (curWatch !== nextWatch) {
-    watchRow.classList.add('preview-diff');
-    prevWatch.textContent = nextWatch ? '→ ' + nextWatch : '→ Clear';
+  const mark = (rowId, tagId, changed, label) => {
+    if (!changed) return;
     diffs++;
-  } else {
-    watchRow.classList.remove('preview-diff');
-  }
+    document.getElementById(rowId).classList.add('preview-diff');
+    document.getElementById(tagId).textContent = '-> ' + label;
+  };
+
+  mark('rowRealtime', 'prevRtp', !!cur.realtimeProtection !== !!tgt.realtimeProtection, tgt.realtimeProtection ? 'ON' : 'OFF');
+  mark('rowBehavior', 'prevBm', !!cur.behaviorMonitoring !== !!tgt.behaviorMonitoring, tgt.behaviorMonitoring ? 'ON' : 'OFF');
+  mark('rowIOAV', 'prevIoav', !!cur.ioavProtection !== !!tgt.ioavProtection, tgt.ioavProtection ? 'ON' : 'OFF');
+  mark('rowScript', 'prevScript', !!cur.scriptScanning !== !!tgt.scriptScanning, tgt.scriptScanning ? 'ON' : 'OFF');
+  mark('rowNetwork', 'prevNet', cur.networkProtection !== tgt.networkProtection, netNames[tgt.networkProtection] || String(tgt.networkProtection));
+  mark('rowCloud', 'prevCloud', cur.cloudProtection !== tgt.cloudProtection, cloudNames[tgt.cloudProtection] || 'OFF');
+  mark('rowSamples', 'prevSamples', cur.sampleSubmission !== tgt.sampleSubmission, sampleNames[tgt.sampleSubmission] || String(tgt.sampleSubmission));
+  mark('rowNags', 'prevNags', !!cur.suppressAllNags !== !!tgt.suppressAllNags, tgt.suppressAllNags ? 'Silenced' : 'Active');
+  mark('rowTray', 'prevTray', !!cur.muteWindowsSecSystray !== !!tgt.muteWindowsSecSystray, tgt.muteWindowsSecSystray ? 'Hidden' : 'Visible');
+
+  const curWatch = (cur.autoStandDownProcesses || []).join(', ');
+  const tgtWatch = (tgt.autoStandDownProcesses || []).join(', ');
+  mark('rowWatch', 'prevWatch', curWatch !== tgtWatch, tgtWatch ? 'Auto-Pause' : 'Cleared');
 
   hint.style.opacity = '1';
   hint.textContent = diffs > 0
     ? `Preview "${meta.title}": ${diffs} change(s)`
-    : `Preview "${meta.title}": matches current`;
+    : `${meta.title} (selected)`;
+}
+
+function applyWindowsTheme(theme) {
+  if (!theme) return;
+  document.body.classList.toggle('light', !theme.darkMode);
+  if (theme.accentColor) {
+    document.documentElement.style.setProperty('--accent', theme.accentColor);
+  }
+  if (theme.accentFg) {
+    document.documentElement.style.setProperty('--accent-fg', theme.accentFg);
+  }
+  if (theme.systemFont) {
+    document.documentElement.style.setProperty('--font-ui', `"${theme.systemFont}", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif`);
+  }
 }
 
 function renderState(data) {
+  applyWindowsTheme(data.theme);
   const st = data.status;
-  const ord = data.orders;
+  if (!stagedOrders) {
+    stagedOrders = { ...data.orders };
+  }
+  const ord = stagedOrders;
   const sd = data.standDown;
   if (data.version && data.version.version) {
     document.getElementById('versionBadge').textContent = 'v' + data.version.version;
   }
 
-  // Compliance Pill
-  const compEl = document.getElementById('complianceBadge');
-  if (sd.active) {
-    compEl.className = 'pill cyan';
-    compEl.textContent = 'STAND-DOWN ACTIVE';
-  } else if (st.inCompliance) {
-    compEl.className = 'pill green';
-    compEl.textContent = '★ KEEPING THE PEACE';
+  const heroEl = document.getElementById('statusHero');
+  const heroTitle = document.getElementById('statusHeroTitle');
+  const heroDesc = document.getElementById('statusHeroDesc');
+  const heroAction = document.getElementById('statusHeroAction');
+  const sidebarStatus = document.getElementById('sidebarStatus');
+  const levelName = ord.presetName === 'custom'
+    ? 'Custom'
+    : ((PRESET_META[ord.presetName] && PRESET_META[ord.presetName].title) || ord.presetName);
+
+  if (data.firstRun) {
+    sidebarStatus.textContent = ord.presetName === 'passive' ? 'Passive' : (st.realtimeProtection ? 'Protected' : 'Real-Time Off');
+    heroEl.className = 'status-hero ' + (st.realtimeProtection ? 'green' : 'red');
+    heroTitle.textContent = ord.presetName === 'passive' ? 'Passive Mode · Not Enforcing' : 'First-Run Setup · Showing Current PC Settings';
+    heroDesc.textContent = ord.presetName === 'passive'
+      ? 'ShieldSheriff policies have been reverted. Select a preset or toggle any setting and click Apply Now to re-enable.'
+      : 'Select a preset on the left or adjust any toggle below to begin managing Windows Defender.';
+    heroAction.innerHTML = '';
+  } else if (sd.active) {
+    sidebarStatus.textContent = 'Paused';
+    heroEl.className = 'status-hero yellow';
+    heroTitle.textContent = 'Paused: ' + sd.reason;
+    heroDesc.textContent = 'Real-Time Protection is temporarily paused (yellow tray icon) and will resume automatically.';
+    heroAction.innerHTML = '<button onclick="standDown(0)">Resume Now</button>';
+  } else if (st.tamperProtectionActive) {
+    sidebarStatus.textContent = 'Attention';
+    heroEl.className = 'status-hero yellow';
+    heroTitle.textContent = 'Attention Needed: Tamper Protection On';
+    heroDesc.textContent = 'Windows Defender Tamper Protection is blocking policy locks (yellow tray icon). Turn it off once in Windows Security.';
+    heroAction.innerHTML = '<button class="warn" onclick="apiCall(\'/api/open-winsec\')">Open Windows Security</button>';
+  } else if (!st.inCompliance) {
+    sidebarStatus.textContent = 'Attention';
+    heroEl.className = 'status-hero yellow';
+    heroTitle.textContent = `Attention Needed: ${st.driftItems.length} Drift Item(s)`;
+    heroDesc.textContent = 'Live Defender settings differ from your configuration (yellow tray icon).';
+    heroAction.innerHTML = '';
+  } else if (!st.realtimeProtection) {
+    sidebarStatus.textContent = 'Real-Time Off';
+    heroEl.className = 'status-hero red';
+    heroTitle.textContent = 'Real-Time Off · ' + levelName;
+    heroDesc.textContent = 'On-access scanning is disabled (red tray icon). Manual scans and definition updates remain available.';
+    heroAction.innerHTML = '';
   } else {
-    compEl.className = 'pill amber';
-    compEl.textContent = st.driftItems.length + ' DRIFT';
+    sidebarStatus.textContent = 'Protected';
+    heroEl.className = 'status-hero green';
+    heroTitle.textContent = 'Protected · ' + levelName;
+    heroDesc.textContent = 'Real-Time Protection is active and settings match your configuration (green tray icon).';
+    heroAction.innerHTML = '';
   }
 
-  // Elevation Pill
+  // Elevation Pill & Apply Now availability
   const elevEl = document.getElementById('elevationBadge');
   const btnElev = document.getElementById('btnElevate');
   if (st.isElevated) {
-    elevEl.className = 'pill gold';
-    elevEl.textContent = '★ ADMIN';
+    elevEl.className = 'pill accent';
+    elevEl.textContent = 'Admin';
     btnElev.style.display = 'none';
   } else {
     elevEl.className = 'pill amber';
-    elevEl.textContent = 'READ-ONLY';
+    elevEl.textContent = 'Read-Only';
     btnElev.style.display = 'inline-block';
   }
 
   // Preset Mode Badge
   const modeBadge = document.getElementById('presetModeBadge');
-  if (ord.presetName === 'custom') {
-    modeBadge.className = 'pill cyan';
+  if (data.firstRun || ord.presetName === 'unconfigured') {
+    modeBadge.className = 'pill accent';
+    modeBadge.textContent = 'Not Configured';
+  } else if (ord.presetName === 'custom') {
+    modeBadge.className = 'pill accent';
     modeBadge.textContent = 'Custom Override';
   } else {
     const m = PRESET_META[ord.presetName];
-    modeBadge.className = 'pill gold';
-    modeBadge.textContent = 'Preset: ' + (m ? m.title : ord.presetName);
+    modeBadge.className = 'pill accent';
+    modeBadge.textContent = m ? m.title : ord.presetName;
   }
 
-  // Callout banners
-  document.getElementById('tamperBanner').style.display = st.tamperProtectionActive ? 'flex' : 'none';
-  const sdBanner = document.getElementById('standDownBanner');
-  if (sd.active) {
-    sdBanner.style.display = 'flex';
-    document.getElementById('standDownTitle').textContent = 'Deputy Standing Down — ' + sd.reason;
-  } else {
-    sdBanner.style.display = 'none';
-  }
-
-  // Presets Gallery (ordered left-to-right: On-Demand -> Dev -> Quiet -> Full Shield)
-  const pGrid = document.getElementById('presetsGrid');
-  pGrid.innerHTML = '';
+  // Sidebar Presets
+  const sbPresets = document.getElementById('sidebarPresets');
+  sbPresets.innerHTML = '';
   const orderedPresets = [...(data.presets || [])].sort((a, b) => {
     const ia = PRESET_ORDER.indexOf(a.id);
     const ib = PRESET_ORDER.indexOf(b.id);
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
   orderedPresets.forEach(p => {
-    const meta = PRESET_META[p.id] || { title: p.name, tag: 'Preset', blurb: p.description };
-    const isActive = ord.presetName === p.id;
-    const card = document.createElement('div');
-    card.className = 'preset-card' + (isActive ? ' active' : '');
-    card.onclick = () => applyPreset(p.id);
-    card.onmouseenter = () => previewPreset(p.id);
-    card.onmouseleave = () => clearPresetPreview();
-    card.innerHTML = `
-      <div class="preset-art">
-        <span class="preset-badge">${isActive ? '★ Active' : meta.tag}</span>
-        ${PRESET_SVGS[p.id] || ''}
-      </div>
-      <div class="preset-meta">
-        <h4>${meta.title}</h4>
-        <p>${meta.blurb}</p>
-      </div>
+    const meta = PRESET_META[p.id] || { title: p.name, bg: 'var(--accent-dim)', fg: 'var(--accent)', icon: '' };
+    const isActive = activeTab === 'orders' && ord.presetName === p.id;
+    const item = document.createElement('div');
+    item.className = 'nav-item' + (isActive ? ' active' : '');
+    item.onclick = () => {
+      if (activeTab !== 'orders') switchTab('orders');
+      applyPreset(p.id);
+    };
+    item.onmouseenter = () => previewPreset(p.id);
+    item.onmouseleave = () => clearPresetPreview();
+    item.innerHTML = `
+      <span class="nav-icon" style="background: ${meta.bg}; color: ${meta.fg};">${meta.icon}</span>
+      <span class="nav-item-text">${meta.title}</span>
     `;
-    pGrid.appendChild(card);
+    sbPresets.appendChild(item);
   });
 
-  // Form controls
-  document.getElementById('chkSuppressAllNags').checked = !!ord.suppressAllNags;
-  document.getElementById('chkMuteSystray').checked = !!ord.muteWindowsSecSystray;
+  document.getElementById('navControls').classList.toggle('active', activeTab === 'orders' && (data.firstRun || ord.presetName === 'custom' || ord.presetName === 'unconfigured'));
+  document.getElementById('navOps').classList.toggle('active', activeTab === 'ops');
+  document.getElementById('navLogs').classList.toggle('active', activeTab === 'logs');
+
+  // Form controls + On/Off text
+  const setSwitch = (chkId, stateId, val) => {
+    document.getElementById(chkId).checked = !!val;
+    document.getElementById(stateId).textContent = val ? 'On' : 'Off';
+  };
+  setSwitch('chkRealtime', 'stateRtp', ord.realtimeProtection);
+  setSwitch('chkBehavior', 'stateBm', ord.behaviorMonitoring);
+  setSwitch('chkIOAV', 'stateIoav', ord.ioavProtection);
+  setSwitch('chkScript', 'stateScript', ord.scriptScanning);
+  setSwitch('chkSuppressAllNags', 'stateNags', ord.suppressAllNags);
+  setSwitch('chkMuteSystray', 'stateTray', ord.muteWindowsSecSystray);
+  setSwitch('chkStartupEnabled', 'stateStartup', ord.startupEnabled);
+  setSwitch('chkEnforceLoop', 'stateLoop', ord.enforceLoop);
+  setSwitch('chkCheckUpdates', 'stateUpdates', ord.checkUpdatesOnStart);
+
+  document.getElementById('selDriftInterval').value = String(ord.driftCheckSeconds || 15);
+  if (data.update && data.update.checked) {
+    const uEl = document.getElementById('updateStatusText');
+    if (data.update.error) {
+      uEl.textContent = 'Last check failed: ' + data.update.error;
+    } else if (data.update.available) {
+      uEl.textContent = `Update available: v${data.update.latestVersion} (current v${data.update.currentVersion})`;
+    } else {
+      uEl.textContent = `Up to date (v${data.update.currentVersion})`;
+    }
+  }
+
   document.getElementById('selCloud').value = String(ord.cloudProtection);
   document.getElementById('selSamples').value = String(ord.sampleSubmission);
-  document.getElementById('chkRealtime').checked = !!ord.realtimeProtection;
-  document.getElementById('chkBehavior').checked = !!ord.behaviorMonitoring;
-  document.getElementById('chkIOAV').checked = !!ord.ioavProtection;
-  document.getElementById('chkScript').checked = !!ord.scriptScanning;
   document.getElementById('selNetwork').value = String(ord.networkProtection);
-  document.getElementById('chkEnforceLoop').checked = !!ord.enforceLoop;
 
   if (document.activeElement !== document.getElementById('txtWatchProcs')) {
     document.getElementById('txtWatchProcs').value = (ord.autoStandDownProcesses || []).join(', ');
   }
+  updateApplyButtonState();
 
-  // Live tags
-  const setLive = (id, text, isOn) => {
+  // Live tags (only shown when live Defender state differs from configured setting)
+  const setLive = (id, text, matches) => {
     const el = document.getElementById(id);
-    el.textContent = 'Live: ' + text;
-    el.className = 'live-tag ' + (isOn ? 'on' : 'off');
+    if (matches) {
+      el.style.display = 'none';
+      el.textContent = '';
+    } else {
+      el.style.display = 'inline-block';
+      el.textContent = 'Live: ' + text;
+      el.className = 'live-tag off';
+    }
   };
-  setLive('liveRtpTag', st.realtimeProtection ? 'ON' : 'OFF', st.realtimeProtection);
-  setLive('liveBmTag', st.behaviorMonitoring ? 'ON' : 'OFF', st.behaviorMonitoring);
-  setLive('liveIoavTag', st.ioavProtection ? 'ON' : 'OFF', st.ioavProtection);
-  setLive('liveScriptTag', st.scriptScanning ? 'ON' : 'OFF', st.scriptScanning);
-  setLive('liveNetTag', st.networkProtection === 0 ? 'OFF' : (st.networkProtection === 1 ? 'Block' : 'Audit'), st.networkProtection > 0);
-  setLive('liveCloudTag', st.cloudProtection === 0 ? 'OFF' : (st.cloudProtection === 1 ? 'Basic' : 'Adv'), st.cloudProtection > 0);
-  setLive('liveSamplesTag', st.sampleSubmission === 2 ? 'Never' : String(st.sampleSubmission), st.sampleSubmission !== 2);
-  setLive('liveNagTag', st.nagsSuppressed ? 'Silenced' : 'Active', st.nagsSuppressed);
-  setLive('liveTrayTag', st.securityTrayIconMuted ? 'Muted' : 'Visible', st.securityTrayIconMuted);
+  setLive('liveRtpTag', st.realtimeProtection ? 'ON' : 'OFF', !!st.realtimeProtection === !!ord.realtimeProtection || sd.active);
+  setLive('liveBmTag', st.behaviorMonitoring ? 'ON' : 'OFF', !!st.behaviorMonitoring === !!ord.behaviorMonitoring);
+  setLive('liveIoavTag', st.ioavProtection ? 'ON' : 'OFF', !!st.ioavProtection === !!ord.ioavProtection);
+  setLive('liveScriptTag', st.scriptScanning ? 'ON' : 'OFF', !!st.scriptScanning === !!ord.scriptScanning);
+  setLive('liveNetTag', st.networkProtection === 0 ? 'OFF' : (st.networkProtection === 1 ? 'Block' : 'Audit'), st.networkProtection === ord.networkProtection);
+  setLive('liveCloudTag', st.cloudProtection === 0 ? 'OFF' : (st.cloudProtection === 1 ? 'Basic' : 'Adv'), st.cloudProtection === ord.cloudProtection);
+  setLive('liveSamplesTag', st.sampleSubmission === 2 ? 'Never' : String(st.sampleSubmission), st.sampleSubmission === ord.sampleSubmission);
+  setLive('liveNagTag', st.nagsSuppressed ? 'Silenced' : 'Active', !!st.nagsSuppressed === !!ord.suppressAllNags);
+  setLive('liveTrayTag', st.securityTrayIconMuted ? 'Muted' : 'Visible', !!st.securityTrayIconMuted === !!ord.muteWindowsSecSystray);
 
   // Telemetry KV
   document.getElementById('kvTamper').textContent = st.tamperProtectionActive
@@ -1056,8 +1201,8 @@ function renderState(data) {
     : `OFF (0x${st.tamperProtectionRaw.toString(16)})`;
   document.getElementById('kvService').textContent = st.serviceRunning ? 'Running' : 'Stopped';
   document.getElementById('kvPlatform').textContent = st.platformVersion || 'Built-in';
-  document.getElementById('kvSig').textContent = st.signatureVersion || '—';
-  document.getElementById('cfgPathLabel').textContent = data.configPath || 'standing_orders.json';
+  document.getElementById('kvSig').textContent = st.signatureVersion || '-';
+  document.getElementById('cfgPathLabel').textContent = data.configPath || 'config.json';
 
   // Audit Log
   const auditEl = document.getElementById('auditList');
@@ -1073,16 +1218,57 @@ function renderState(data) {
   renderPresetDiffPreview();
 }
 
-async function saveOrdersFromUI() {
-  if (!currentState) return;
+function ordersEqual(a, b) {
+  if (!a || !b) return false;
+  const watchA = (a.autoStandDownProcesses || []).join(',');
+  const watchB = (b.autoStandDownProcesses || []).join(',');
+  return (a.presetName || '') === (b.presetName || '') &&
+    !!a.realtimeProtection === !!b.realtimeProtection &&
+    !!a.behaviorMonitoring === !!b.behaviorMonitoring &&
+    !!a.ioavProtection === !!b.ioavProtection &&
+    !!a.scriptScanning === !!b.scriptScanning &&
+    a.networkProtection === b.networkProtection &&
+    a.cloudProtection === b.cloudProtection &&
+    a.sampleSubmission === b.sampleSubmission &&
+    !!a.suppressAllNags === !!b.suppressAllNags &&
+    !!a.muteWindowsSecSystray === !!b.muteWindowsSecSystray &&
+    !!a.startupEnabled === !!b.startupEnabled &&
+    !!a.enforceLoop === !!b.enforceLoop &&
+    (a.driftCheckSeconds || 15) === (b.driftCheckSeconds || 15) &&
+    !!a.checkUpdatesOnStart === !!b.checkUpdatesOnStart &&
+    watchA === watchB;
+}
+
+function updateApplyButtonState() {
+  const btnApply = document.getElementById('btnApplyNow');
+  if (!btnApply || !currentState) return;
+  const st = currentState.status;
+  const staged = stagedOrders || currentState.orders;
+  const hasEdits = !ordersEqual(staged, currentState.orders);
+  const needsSync = !currentState.firstRun && !st.inCompliance;
+
+  if (!st.isElevated) {
+    btnApply.disabled = true;
+    btnApply.title = 'Administrator privileges required to apply changes';
+  } else if (!hasEdits && !needsSync) {
+    btnApply.disabled = true;
+    btnApply.title = currentState.firstRun ? 'Select a preset or adjust a setting first' : 'All settings are already applied';
+  } else {
+    btnApply.disabled = false;
+    btnApply.title = '';
+  }
+}
+
+function readOrdersFromForm(baseOrders, presetName) {
   const watchRaw = document.getElementById('txtWatchProcs').value;
   const watchList = watchRaw.split(',').map(s => s.trim()).filter(Boolean);
-
-  const orders = {
-    ...currentState.orders,
-    presetName: 'custom',
-    elected: true,
+  return {
+    ...baseOrders,
+    presetName: presetName,
+    startupEnabled: document.getElementById('chkStartupEnabled').checked,
     enforceLoop: document.getElementById('chkEnforceLoop').checked,
+    driftCheckSeconds: parseInt(document.getElementById('selDriftInterval').value, 10) || 15,
+    checkUpdatesOnStart: document.getElementById('chkCheckUpdates').checked,
     suppressAllNags: document.getElementById('chkSuppressAllNags').checked,
     suppressEnhancedNags: document.getElementById('chkSuppressAllNags').checked,
     muteWindowsSecSystray: document.getElementById('chkMuteSystray').checked,
@@ -1095,36 +1281,108 @@ async function saveOrdersFromUI() {
     networkProtection: parseInt(document.getElementById('selNetwork').value, 10),
     autoStandDownProcesses: watchList,
   };
+}
 
+function stageOrdersFromUI(skipRender) {
+  if (!currentState) return;
+  stagedOrders = readOrdersFromForm(stagedOrders || currentState.orders, 'custom');
+  if (skipRender) {
+    updateApplyButtonState();
+    return;
+  }
+  renderState(currentState);
+}
+
+function saveOrdersFromUI() {
+  stageOrdersFromUI(false);
+}
+
+function applyPreset(id) {
+  if (!currentState) return;
+  const preset = (currentState.presets || []).find(p => p.id === id);
+  if (!preset) return;
+  const cur = stagedOrders || currentState.orders;
+  stagedOrders = {
+    ...preset.orders,
+    presetName: preset.id,
+    startupEnabled: cur.startupEnabled,
+    enforceLoop: cur.enforceLoop,
+    driftCheckSeconds: cur.driftCheckSeconds || 15,
+    checkUpdatesOnStart: cur.checkUpdatesOnStart,
+  };
+  renderState(currentState);
+}
+
+function closeAutoHealModal() {
+  document.getElementById('autoHealModal').classList.remove('open');
+}
+
+async function finishFirstRunApply() {
+  closeAutoHealModal();
+  if (!currentState) return;
+  const base = stagedOrders || currentState.orders;
+  const orders = {
+    ...readOrdersFromForm(base, base.presetName || 'custom'),
+    elected: true,
+    startupEnabled: document.getElementById('chkConsentStartup').checked,
+    enforceLoop: document.getElementById('chkConsentAutoHeal').checked,
+    driftCheckSeconds: parseInt(document.getElementById('selConsentInterval').value, 10) || 15,
+    checkUpdatesOnStart: document.getElementById('chkConsentUpdates').checked,
+  };
   const res = await fetch('/api/orders', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(orders)
   });
   const out = await res.json();
-  showToast(out.message || 'Standing Orders updated');
-  fetchState();
-}
-
-async function applyPreset(id) {
-  const res = await fetch('/api/preset?id=' + encodeURIComponent(id), { method: 'POST' });
-  const out = await res.json();
-  showToast(out.message || 'Preset applied');
+  stagedOrders = null;
+  showToast(out.message || 'Configuration applied');
   fetchState();
 }
 
 async function standDown(minutes) {
   const res = await fetch('/api/standdown?minutes=' + minutes, { method: 'POST' });
   const out = await res.json();
-  showToast(out.message || 'Updated Stand-Down state');
+  showToast(out.message || 'Pause state updated');
   fetchState();
 }
 
-async function enforceNow() {
-  const res = await fetch('/api/enforce', { method: 'POST' });
+async function enterPassiveMode() {
+  const res = await fetch('/api/passive', { method: 'POST' });
   const out = await res.json();
-  showToast(out.message || 'Standing Orders enforced');
+  stagedOrders = null;
+  showToast(out.message || 'Entered Passive Mode');
   fetchState();
+}
+
+async function applyChanges() {
+  if (!currentState) return;
+  if (currentState.firstRun) {
+    document.getElementById('autoHealModal').classList.add('open');
+    return;
+  }
+  const btnApply = document.getElementById('btnApplyNow');
+  btnApply.disabled = true;
+  btnApply.textContent = 'Applying...';
+  try {
+    const base = stagedOrders || currentState.orders;
+    const orders = {
+      ...readOrdersFromForm(base, base.presetName || 'custom'),
+      elected: true,
+    };
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(orders)
+    });
+    const out = await res.json();
+    stagedOrders = null;
+    showToast(out.message || 'Settings applied');
+    await fetchState();
+  } finally {
+    btnApply.textContent = 'Apply Now';
+    updateApplyButtonState();
+  }
 }
 
 async function elevateApp() {
@@ -1141,17 +1399,7 @@ async function apiCall(path) {
   fetchState();
 }
 
-fetchState().then(() => {
-  setTimeout(() => {
-    const container = document.querySelector('.container');
-    if (!container) return;
-    const targetW = 840;
-    const targetH = Math.min(780, Math.max(700, container.offsetHeight + 100));
-    if (Math.abs(window.outerWidth - targetW) > 60 || Math.abs(window.outerHeight - targetH) > 80) {
-      try { window.resizeTo(targetW, targetH); } catch (_) {}
-    }
-  }, 120);
-});
+fetchState();
 setInterval(fetchState, 3000);
 </script>
 </body>

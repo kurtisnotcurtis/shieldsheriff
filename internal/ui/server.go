@@ -11,11 +11,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/jchv/go-webview2"
 	"shieldsheriff/internal/defender"
 	"shieldsheriff/internal/sheriff"
 	"shieldsheriff/internal/version"
@@ -34,6 +36,8 @@ type Server struct {
 	onShutdown func()
 	openMu     sync.Mutex
 	lastOpen   time.Time
+	activeWV   webview2.WebView
+	activeHWND uintptr
 }
 
 // StartServer starts the local loopback Command Center HTTP server.
@@ -73,6 +77,13 @@ func (s *Server) SetOnShutdown(fn func()) {
 
 // Shutdown gracefully stops the Command Center HTTP server.
 func (s *Server) Shutdown(ctx context.Context) error {
+	s.openMu.Lock()
+	wv := s.activeWV
+	s.openMu.Unlock()
+	if wv != nil {
+		wv.Terminate()
+	}
+	closeExistingCommandCenterWindow()
 	if s.httpSrv != nil {
 		return s.httpSrv.Shutdown(ctx)
 	}
@@ -96,6 +107,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/orders", s.handleOrders)
 	mux.HandleFunc("/api/preset", s.handlePreset)
 	mux.HandleFunc("/api/standdown", s.handleStandDown)
+	mux.HandleFunc("/api/passive", s.handlePassiveMode)
 	mux.HandleFunc("/api/enforce", s.handleEnforce)
 	mux.HandleFunc("/api/focus", s.handleFocus)
 	mux.HandleFunc("/api/elevate", s.handleElevate)
@@ -104,6 +116,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/update-sigs", s.handleUpdateSigs)
 	mux.HandleFunc("/api/service-install", s.handleServiceInstall)
 	mux.HandleFunc("/api/service-uninstall", s.handleServiceUninstall)
+	mux.HandleFunc("/api/check-updates", s.handleCheckUpdates)
 	return mux
 }
 
@@ -112,21 +125,75 @@ func (s *Server) URL() string {
 	return s.url
 }
 
-// OpenWindow opens the Command Center in a native-feeling chromeless Edge/Chrome app window
-// (falling back to the default browser), or focuses the existing window if one is already open.
+// OpenWindow opens the Command Center in a native Windows 11 WebView2 window with Mica chrome
+// (falling back to Edge --app / default browser if WebView2 is unavailable), or focuses the existing window.
 func (s *Server) OpenWindow() {
 	s.openMu.Lock()
-	defer s.openMu.Unlock()
-
+	if s.activeHWND != 0 {
+		hwnd := s.activeHWND
+		s.openMu.Unlock()
+		focusWindowHandle(hwnd)
+		return
+	}
 	if focusExistingCommandCenterWindow() {
+		s.openMu.Unlock()
 		return
 	}
 	if !s.lastOpen.IsZero() && time.Since(s.lastOpen) < 1500*time.Millisecond {
+		s.openMu.Unlock()
 		return
 	}
 	s.lastOpen = time.Now()
+	url := s.url
+	s.openMu.Unlock()
 
-	args := []string{"--app=" + s.url, "--window-size=840,750"}
+	var profileDir string
+	if cacheDir, err := os.UserCacheDir(); err == nil && cacheDir != "" {
+		profileDir = filepath.Join(cacheDir, "ShieldSheriff", "webview2")
+	}
+
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		w := webview2.NewWithOptions(webview2.WebViewOptions{
+			AutoFocus: true,
+			DataPath:  profileDir,
+			WindowOptions: webview2.WindowOptions{
+				Title:  "ShieldSheriff",
+				Width:  1120,
+				Height: 780,
+				Center: true,
+			},
+		})
+		if w == nil {
+			s.openEdgeFallback(url)
+			return
+		}
+
+		hwnd := uintptr(w.Window())
+		applyWindows11Chrome(hwnd, ReadWindowsTheme().DarkMode)
+
+		s.openMu.Lock()
+		s.activeWV = w
+		s.activeHWND = hwnd
+		s.openMu.Unlock()
+
+		w.Navigate(url)
+		w.Run()
+		w.Destroy()
+
+		s.openMu.Lock()
+		if s.activeWV == w {
+			s.activeWV = nil
+			s.activeHWND = 0
+		}
+		s.openMu.Unlock()
+	}()
+}
+
+func (s *Server) openEdgeFallback(url string) {
+	args := []string{"--app=" + url, "--window-size=1120,780"}
 	if cacheDir, err := os.UserCacheDir(); err == nil && cacheDir != "" {
 		profileDir := filepath.Join(cacheDir, "ShieldSheriff", "edge-app")
 		args = append(args, "--user-data-dir="+profileDir)
@@ -144,7 +211,7 @@ func (s *Server) OpenWindow() {
 			}
 		}
 	}
-	_ = exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", s.url).Start()
+	_ = exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", url).Start()
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -174,9 +241,12 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	st, ord, sd, logs, cfgPath := s.gov.Snapshot()
 	writeJSON(w, map[string]any{
 		"version":    version.Info(),
+		"theme":      ReadWindowsTheme(),
+		"firstRun":   s.gov.IsFirstRun(),
 		"status":     st,
 		"orders":     ord,
 		"standDown":  sd,
+		"update":     s.gov.GetUpdateInfo(),
 		"auditLog":   logs,
 		"configPath": cfgPath,
 		"presets":    defender.BuiltinPresets(),
@@ -194,7 +264,7 @@ func (s *Server) handleOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := s.gov.UpdateOrders(orders)
-	msg := fmt.Sprintf("Saved & enforced (%d policies applied)", len(res.Applied))
+	msg := fmt.Sprintf("Applied %d setting(s)", len(res.Applied))
 	if !res.Success && len(res.Warnings) > 0 {
 		msg = "Orders saved to disk (" + res.Warnings[0] + ")"
 	} else if err != nil {
@@ -219,16 +289,25 @@ func (s *Server) handlePreset(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": false, "message": "Unknown preset: " + id})
 }
 
+func (s *Server) handlePassiveMode(w http.ResponseWriter, r *http.Request) {
+	res := s.gov.EnterPassiveMode()
+	msg := "Entered Passive Mode (policies reverted)"
+	if !res.Success && len(res.Warnings) > 0 {
+		msg = res.Warnings[0]
+	}
+	writeJSON(w, map[string]any{"ok": res.Success, "message": msg})
+}
+
 func (s *Server) handleStandDown(w http.ResponseWriter, r *http.Request) {
 	mins, _ := strconv.Atoi(r.URL.Query().Get("minutes"))
 	if mins <= 0 {
 		res := s.gov.ResumeFromStandDown()
-		writeJSON(w, map[string]any{"ok": res.Success, "message": "Deputy resumed normal duty"})
+		writeJSON(w, map[string]any{"ok": res.Success, "message": "Protection resumed"})
 		return
 	}
 	dur := time.Duration(mins) * time.Minute
-	res := s.gov.StartStandDown(dur, fmt.Sprintf("%dm Manual Pause", mins))
-	msg := fmt.Sprintf("Deputy standing down for %d minutes", mins)
+	res := s.gov.StartStandDown(dur, fmt.Sprintf("%dm Pause", mins))
+	msg := fmt.Sprintf("Protection paused for %d minutes", mins)
 	if !res.Success && len(res.Warnings) > 0 {
 		msg += " (" + res.Warnings[0] + ")"
 	}
@@ -237,7 +316,7 @@ func (s *Server) handleStandDown(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEnforce(w http.ResponseWriter, r *http.Request) {
 	res := s.gov.EnforceNow()
-	msg := fmt.Sprintf("Enforced %d Standing Order rules", len(res.Applied))
+	msg := fmt.Sprintf("Applied %d policy rules", len(res.Applied))
 	if !res.Success && len(res.Warnings) > 0 {
 		msg = res.Warnings[0]
 	}
@@ -301,4 +380,15 @@ func (s *Server) handleServiceUninstall(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "message": "Removed ShieldSheriff SYSTEM service"})
+}
+
+func (s *Server) handleCheckUpdates(w http.ResponseWriter, r *http.Request) {
+	info := s.gov.CheckForUpdates()
+	msg := fmt.Sprintf("Up to date (v%s)", info.CurrentVersion)
+	if info.Error != "" {
+		msg = "Update check failed: " + info.Error
+	} else if info.Available {
+		msg = fmt.Sprintf("Update available: v%s", info.LatestVersion)
+	}
+	writeJSON(w, map[string]any{"ok": info.Error == "", "message": msg, "update": info})
 }
