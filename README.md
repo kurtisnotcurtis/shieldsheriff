@@ -4,17 +4,17 @@
 
 # ShieldSheriff
 
-**Put Windows Defender Under Your Command — Nag-Free, Granular, Permanent Standing Orders for Windows 11.**
+**Granular, Nag-Free Control for Windows 11 Defender.**
 
-> **Platform Support:** Windows 11 only.
+> **Platform & Privileges:** Windows 11 only. ShieldSheriff prompts for Administrator (UAC) on launch to apply Defender policies (falling back to Read-Only mode if declined). Ensure **Tamper Protection** is toggled `OFF` once in `windowsdefender://threatsettings` so Defender honors local policy locks.
 
-Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a solid antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags when you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**—and Windows Updates frequently flip your settings back on.
+Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a solid antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags when you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**—and Windows Updates or Defender background tasks frequently flip your settings back on.
 
-Rather than registering as a fake third-party antivirus in Windows Security Center (which causes `MsMpEng.exe` to automatically disable its own real-time protection and requires an MVI ELAM kernel certificate), **ShieldSheriff** acts as your **user-elected governor**:
-- **Deputizes Built-in Defender:** Keeps `WinDefend` alive and under your granular **Standing Orders** (`Real-Time Protection`, `Behavior Monitoring`, `IOAV Downloaded Files Scan`, `Script Scanning`, `Network Protection`, `Cloud Protection`, and `Sample Submission`).
-- **Keeps the Peace (Silences Nags):** Applies Windows Security Center notification & UX policies (`DisableNotifications`, `DisableEnhancedNotifications`, `Notification_Suppress`) and optionally mutes the default `SecurityHealthSystray.exe` icon (with automatic registry backup & restore).
-- **Stops Settings Drift:** Continuously monitors live Registry & WMI (`MSFT_MpPreference`) state and automatically restores your Standing Orders if a Windows Update tries to flip them back.
-- **Deputy Stand-Down (Timed & Process-Aware Pause):** Pause Real-Time Protection for 15m / 30m / 1h / 4h, or automatically whenever specified build tools or games (`cargo.exe`, `msbuild.exe`, `link.exe`, `rustc.exe`, etc.) are running.
+Rather than registering as a fake third-party antivirus in Windows Security Center (which causes `MsMpEng.exe` to automatically disable its own real-time protection and requires an MVI ELAM kernel certificate), **ShieldSheriff** manages Defender directly using native Windows policies:
+- **Granular Protection Engines:** Keeps `WinDefend` alive while giving you direct control over `Real-Time Protection`, `Behavior Monitoring`, `Downloads & Attachments (IOAV)`, `Script Scanning (AMSI)`, `Network Protection`, `Cloud Protection (MAPS)`, and `Sample Submission`.
+- **Silence Security Nags:** Applies Windows Security Center notification & UX policies (`DisableNotifications`, `DisableEnhancedNotifications`, `Notification_Suppress`) and optionally hides the default `SecurityHealthSystray.exe` icon (with automatic registry backup & restore).
+- **Auto-Heal Settings Drift:** Periodically inspects live Registry & WMI (`MSFT_MpPreference`) state at your configured interval (default 15s) and restores your chosen settings if Defender or Windows Update resets them.
+- **Pause Protection & Auto-Pause Watchlist:** Temporarily pause Real-Time Protection for 15m / 30m / 1h / 4h, or automatically whenever specified build tools or games (`cargo.exe`, `msbuild.exe`, `link.exe`, `rustc.exe`, etc.) are running.
 
 ---
 
@@ -65,19 +65,7 @@ shieldsheriff/
 # (or: go build -trimpath -ldflags="-s -w" -o bin\shiesh.exe ./cmd/shieldsheriff)
 ```
 
-### 2. Inspect Live Defender Status & Drift
-```powershell
-.\bin\shiesh.exe status
-```
-
-### 3. Elect ShieldSheriff & Enforce Standing Orders (Requires Admin / UAC)
-*(Note: Ensure **Tamper Protection** is toggled `OFF` once in `windowsdefender://threatsettings` so Defender honors local policy locks.)*
-```powershell
-# Apply the default "Quiet Guardian" preset (Real-Time ON, Cloud OFF, Sample Submission OFF, Nags Silenced)
-.\bin\shiesh.exe elect --elevate
-```
-
-### 4. Launch the System Tray Shield & Command Center UI
+### 2. Launch ShieldSheriff (UI & System Tray)
 ```powershell
 .\bin\shiesh.exe
 ```
@@ -86,10 +74,18 @@ shieldsheriff/
   - **Preset Mode:** Displays the active preset's shield icon (**On-Demand Only** red `-`, **Developer Workstation** sky-blue `<>`, **Quiet Guardian** blue shield, **Full Shield** green checkmark, or **Custom**).
   - **Pause Mode:** Amber shield with `||` pause bars when temporarily paused by timer or watched build process.
   - **Passive Mode:** Hollow slate shield outline when not enforcing (first run or after reverting ShieldSheriff policies).
-- **Single-Instance Locking:** Relaunching focuses the existing Command Center window instead of opening duplicates.
+- **Single-Instance Locking:** Relaunching focuses the existing window instead of opening duplicates.
 
-### 5. Granular CLI Control
+### 3. Inspect Live Defender Status (CLI)
 ```powershell
+.\bin\shiesh.exe status
+```
+
+### 4. Apply a Preset or Granular Settings (CLI)
+```powershell
+# Apply the default "Quiet Guardian" preset (Real-Time ON, Cloud OFF, Sample Submission OFF, Nags Silenced):
+.\bin\shiesh.exe elect --elevate
+
 # Keep Real-Time ON, turn Behavior/Script scanning OFF, Cloud & Sample uploads OFF, and silence all nags:
 .\bin\shiesh.exe order realtime=on behavior=off script=off cloud=off samples=never nags=off
 
@@ -97,7 +93,7 @@ shieldsheriff/
 .\bin\shiesh.exe order watch=cargo.exe,msbuild.exe
 
 # Manually pause Real-Time Protection for 30 minutes, then auto-resume:
-.\bin\shiesh.exe standdown 30
+.\bin\shiesh.exe pause 30
 
 # Install as a 24/7 background SYSTEM Windows Service across reboots:
 .\bin\shiesh.exe service install
