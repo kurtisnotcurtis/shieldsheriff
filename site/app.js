@@ -5,8 +5,8 @@ const PRESETS = {
     badgeClass: "chip-gold",
     rtp: { text: "ON (Locked)", cls: "chip-on" },
     bm: { text: "ON (Locked)", cls: "chip-on" },
-    cloud: { text: "OFF — SpynetReporting=0", cls: "chip-off" },
-    samples: { text: "NEVER — SubmitSamplesConsent=2", cls: "chip-off" },
+    cloud: { text: "OFF (SpynetReporting=0)", cls: "chip-off" },
+    samples: { text: "NEVER (SubmitSamplesConsent=2)", cls: "chip-off" },
     nags: { text: "SILENCED (DisableNotifications=1)", cls: "chip-gold" },
     watch: { text: "Manual / Timer Only", cls: "chip-off" },
     trayText: "ShieldSheriff: Quiet Guardian"
@@ -17,8 +17,8 @@ const PRESETS = {
     badgeClass: "chip-cyan",
     rtp: { text: "ON (Auto-Pauses on Builds)", cls: "chip-cyan" },
     bm: { text: "OFF (Zero Hook Overhead)", cls: "chip-off" },
-    cloud: { text: "OFF — SpynetReporting=0", cls: "chip-off" },
-    samples: { text: "NEVER — Uncompiled Binaries Stay Local", cls: "chip-off" },
+    cloud: { text: "OFF (SpynetReporting=0)", cls: "chip-off" },
+    samples: { text: "NEVER (Uncompiled Binaries Stay Local)", cls: "chip-off" },
     nags: { text: "SILENCED + Tray Icon Muted", cls: "chip-gold" },
     watch: { text: "cargo.exe, msbuild.exe, link.exe, rustc.exe", cls: "chip-cyan" },
     trayText: "ShieldSheriff: Developer Workstation"
@@ -29,8 +29,8 @@ const PRESETS = {
     badgeClass: "chip-gold",
     rtp: { text: "PERMANENTLY OFF (No 24h Reset)", cls: "chip-off" },
     bm: { text: "OFF", cls: "chip-off" },
-    cloud: { text: "OFF — SpynetReporting=0", cls: "chip-off" },
-    samples: { text: "NEVER — SubmitSamplesConsent=2", cls: "chip-off" },
+    cloud: { text: "OFF (SpynetReporting=0)", cls: "chip-off" },
+    samples: { text: "NEVER (SubmitSamplesConsent=2)", cls: "chip-off" },
     nags: { text: "SILENCED (No Red Shield Warnings)", cls: "chip-gold" },
     watch: { text: "MpCmdRun.exe CLI Scans Still Active", cls: "chip-on" },
     trayText: "ShieldSheriff: On-Demand Only"
@@ -41,8 +41,8 @@ const PRESETS = {
     badgeClass: "chip-on",
     rtp: { text: "ON (Locked)", cls: "chip-on" },
     bm: { text: "ON + Network Protection Block", cls: "chip-on" },
-    cloud: { text: "ON — Advanced MAPS (2)", cls: "chip-on" },
-    samples: { text: "NEVER — No Automatic File Uploads", cls: "chip-off" },
+    cloud: { text: "ON (Advanced MAPS 2)", cls: "chip-on" },
+    samples: { text: "NEVER (No Automatic File Uploads)", cls: "chip-off" },
     nags: { text: "SILENCED (No Sample/Tamper Nags)", cls: "chip-gold" },
     watch: { text: "15s Auto-Heal Active", cls: "chip-on" },
     trayText: "ShieldSheriff: Full Shield"
@@ -59,7 +59,7 @@ const SCENARIOS = {
     rows: ["row-philosophy", "row-cloud-off", "row-nags", "row-drift"]
   },
   "dev": {
-    verdict: "<strong>Developer Build Speed:</strong> <strong>ShieldSheriff</strong> watches for <code>cargo.exe</code>, <code>msbuild.exe</code>, and <code>link.exe</code>—automatically pausing Real-Time scanning during builds and resuming on exit.",
+    verdict: "<strong>Developer Build Speed:</strong> <strong>ShieldSheriff</strong> watches for <code>cargo.exe</code>, <code>msbuild.exe</code>, and <code>link.exe</code>, automatically pausing Real-Time scanning during builds and resuming on exit.",
     rows: ["row-process-watch", "row-subengines", "row-wsman"]
   },
   "ondemand": {
