@@ -17,6 +17,22 @@ Machine-readable release and platform compatibility metadata is also maintained 
 
 ---
 
+## [2026.11.5] (2026-11-16)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
+
+### Added
+- **About Modal (`internal/ui/dashboard.html`):** Made the top-left **ShieldSheriff** brand and version clickable to open an About modal with developer attribution, MIT license note, and GitHub link.
+
+### Changed
+- **Streamlined System Tray Menu (`internal/tray/systray.go`):** Promoted preset options (`Quiet Guardian`, `Developer Workstation`, `On-Demand Only`, `Full Shield`) to top-level tray menu items and removed the `Protection Engines`, `Silence Security Nags`, and `Hide Windows Security Tray Icon` entries.
+
+### Fixed
+- **Consistent First-Run State in Settings (`internal/sheriff/governor.go`, `internal/ui/dashboard.html`):** Set `EnforceLoop` to `false` during initial unconfigured first-run state, added a `Not Configured` indicator in the Settings card, disabled the drift interval selector when Auto-Heal is off, and pre-populated the first-run consent modal from staged Settings values.
+
+---
+
 ## [2026.11.4] (2026-11-16)
 
 * **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)

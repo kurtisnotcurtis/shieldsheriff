@@ -92,8 +92,13 @@
     display: flex;
     align-items: center;
     gap: 11px;
-    padding: 6px 8px 14px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s ease;
   }
+  .sidebar-brand:hover { background: var(--nav-hover); }
   .sidebar-brand svg {
     width: 36px;
     height: 36px;
@@ -216,6 +221,9 @@
   .pill.green { background: var(--green-dim); color: var(--green); }
   .pill.red { background: var(--red-dim); color: var(--red); }
   .pill.amber { background: var(--amber-dim); color: var(--amber); }
+  .pill.muted { background: var(--nav-hover); color: var(--muted); }
+  .pill.link { cursor: pointer; }
+  .pill.link:hover { filter: brightness(1.1); }
 
   button {
     font-family: inherit;
@@ -515,7 +523,7 @@
 <div class="shell">
   <!-- Left Sidebar (Windows 11 Settings style) -->
   <aside class="sidebar">
-    <div class="sidebar-brand">
+    <div class="sidebar-brand" onclick="openAboutModal()" title="About ShieldSheriff">
       <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="ShieldSheriff Logo">
         <defs>
           <linearGradient id="shieldBg" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
@@ -759,8 +767,11 @@
 
         <div class="card">
           <div class="card-head">
-            <h2>Startup, Auto-Heal &amp; Updates</h2>
-            <span class="card-sub">Background behavior, drift interval &amp; updates</span>
+            <div>
+              <h2>Startup, Auto-Heal &amp; Updates</h2>
+              <span class="card-sub">Background behavior, drift interval &amp; updates</span>
+            </div>
+            <span id="settingsModeBadge" class="pill muted" style="display:none;">Not Configured</span>
           </div>
           <div class="setting-row">
             <div class="setting-info">
@@ -827,6 +838,38 @@
       </div>
     </div>
   </main>
+</div>
+
+<div class="modal-backdrop" id="aboutModal" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" onclick="if(event.target===this) closeAboutModal()">
+  <div class="modal-card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <svg viewBox="0 0 64 64" width="40" height="40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M12 14 L32 7 L52 14 V31 C52 45 42 54 32 58 C22 54 12 45 12 31 Z" fill="#0F172A" stroke="#FACC15" stroke-width="2.8" stroke-linejoin="round"/>
+        <g transform="rotate(-7 32 33)">
+          <path d="M17 37 C17 31 22 28.5 27 29.5 L41.5 30.5 C46 30 48.5 32.5 47.5 35.5 C46.5 38 40.5 37 35.5 40.5 C30.5 44 22.5 46.5 18.5 43.5 C16.8 42 16.8 39.5 17 37 Z" fill="#FACC15"/>
+          <path d="M23.5 33 L25 22.5 C26 19.5 38 18.5 40 21.5 L42 32.5 Z" fill="#FACC15"/>
+          <path d="M22.5 33.5 Q32 33 42.5 31.5" stroke="#0F172A" stroke-width="1.9" stroke-linecap="round"/>
+          <path d="M20 42.2 Q29 41.2 37 36.2 Q42 33.4 46 34.2" stroke="#0F172A" stroke-width="1.7" stroke-linecap="round"/>
+          <path d="M26.5 23.8 Q32 24.8 38.5 21.8" stroke="#0F172A" stroke-width="1.7" stroke-linecap="round"/>
+          <path d="M34.5 24.8 Q32.5 27.6 36.5 29" stroke="#0F172A" stroke-width="1.6" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <div>
+        <h2 id="aboutTitle" style="margin-bottom:2px;">ShieldSheriff <span id="aboutVersion" style="font-weight:400;color:var(--muted);font-size:0.85rem;">v2026.11.5</span></h2>
+        <div style="font-size:0.75rem;color:var(--muted);">Granular, Nag-Free Control for Windows 11 Defender</div>
+      </div>
+    </div>
+    <p style="margin-bottom:8px;">
+      Developed by <strong>Kurt Galiatsatos</strong> (<a href="https://github.com/kurtisnotcurtis" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;">@kurtisnotcurtis</a>)<br>
+      Released under the MIT License.
+    </p>
+    <p style="margin-bottom:14px;">
+      Source &amp; releases: <a href="https://github.com/kurtisnotcurtis/shieldsheriff" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;">github.com/kurtisnotcurtis/shieldsheriff</a>
+    </p>
+    <div class="modal-actions">
+      <button class="primary" onclick="closeAboutModal()">Close</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-backdrop" id="autoHealModal" role="dialog" aria-modal="true" aria-labelledby="autoHealTitle">
@@ -1029,6 +1072,7 @@ function renderState(data) {
   const sd = data.standDown;
   if (data.version && data.version.version) {
     document.getElementById('versionBadge').textContent = 'v' + data.version.version;
+    document.getElementById('aboutVersion').textContent = 'v' + data.version.version;
   }
 
   const heroEl = document.getElementById('statusHero');
@@ -1093,6 +1137,8 @@ function renderState(data) {
     btnElev.style.display = 'inline-block';
   }
 
+  const savedOrd = data.orders;
+
   // Preset Mode Badge
   const modeBadge = document.getElementById('presetModeBadge');
   if (data.firstRun || ord.presetName === 'unconfigured') {
@@ -1152,7 +1198,17 @@ function renderState(data) {
   setSwitch('chkEnforceLoop', 'stateLoop', ord.enforceLoop);
   setSwitch('chkCheckUpdates', 'stateUpdates', ord.checkUpdatesOnStart);
 
-  document.getElementById('selDriftInterval').value = String(ord.driftCheckSeconds || 15);
+  const isUnconfigured = (data.firstRun || savedOrd.presetName === 'unconfigured') && !stagedOrders;
+  const settingsBadge = document.getElementById('settingsModeBadge');
+  if (settingsBadge) {
+    settingsBadge.style.display = isUnconfigured ? 'inline-flex' : 'none';
+  }
+  if (isUnconfigured && !ord.enforceLoop) {
+    document.getElementById('stateLoop').textContent = 'Not Configured';
+  }
+  const selDrift = document.getElementById('selDriftInterval');
+  selDrift.value = String(ord.driftCheckSeconds || 15);
+  selDrift.disabled = !ord.enforceLoop;
   if (data.update && data.update.checked) {
     const uEl = document.getElementById('updateStatusText');
     if (data.update.error) {
@@ -1313,6 +1369,14 @@ function applyPreset(id) {
   renderState(currentState);
 }
 
+function openAboutModal() {
+  document.getElementById('aboutModal').classList.add('open');
+}
+
+function closeAboutModal() {
+  document.getElementById('aboutModal').classList.remove('open');
+}
+
 function closeAutoHealModal() {
   document.getElementById('autoHealModal').classList.remove('open');
 }
@@ -1358,6 +1422,12 @@ async function enterPassiveMode() {
 async function applyChanges() {
   if (!currentState) return;
   if (currentState.firstRun) {
+    document.getElementById('chkConsentStartup').checked = document.getElementById('chkStartupEnabled').checked;
+    document.getElementById('chkConsentAutoHeal').checked = stagedOrders
+      ? document.getElementById('chkEnforceLoop').checked
+      : true;
+    document.getElementById('selConsentInterval').value = document.getElementById('selDriftInterval').value || '15';
+    document.getElementById('chkConsentUpdates').checked = document.getElementById('chkCheckUpdates').checked;
     document.getElementById('autoHealModal').classList.add('open');
     return;
   }

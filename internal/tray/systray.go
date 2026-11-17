@@ -78,16 +78,6 @@ const (
 	cmdPresetOnDemand      = 1012
 	cmdPresetFullShield    = 1013
 
-	cmdToggleRealtime = 1020
-	cmdToggleBehavior = 1021
-	cmdToggleIOAV     = 1022
-	cmdToggleScript   = 1023
-	cmdToggleCloud    = 1024
-	cmdToggleSamples  = 1025
-
-	cmdToggleSuppressNags = 1030
-	cmdToggleMuteSystray  = 1031
-
 	cmdStandDown15m    = 1040
 	cmdStandDown30m    = 1041
 	cmdStandDown1h     = 1042
@@ -437,28 +427,11 @@ func (t *AppTray) showContextMenu() {
 	}
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
-	// Presets Submenu
-	hPresets, _, _ := procCreatePopupMenu.Call()
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "quiet-guardian"), cmdPresetQuietGuardian, "Quiet Guardian")
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "dev-workstation"), cmdPresetDevWork, "Developer Workstation")
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "on-demand-only"), cmdPresetOnDemand, "On-Demand Only")
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "full-shield-no-nag"), cmdPresetFullShield, "Full Shield")
-	appendMenuItem(hMenu, mfPopup, hPresets, "Presets")
-
-	// Protection Engines Submenu
-	hEngines, _, _ := procCreatePopupMenu.Call()
-	appendMenuItem(hEngines, checkFlag(ord.RealtimeProtection), cmdToggleRealtime, "Real-Time Protection")
-	appendMenuItem(hEngines, checkFlag(ord.BehaviorMonitoring), cmdToggleBehavior, "Behavior Monitoring")
-	appendMenuItem(hEngines, checkFlag(ord.IOAVProtection), cmdToggleIOAV, "Downloads & Attachments (IOAV)")
-	appendMenuItem(hEngines, checkFlag(ord.ScriptScanning), cmdToggleScript, "Script Scanning (AMSI)")
-	procAppendMenuW.Call(hEngines, mfSeparator, 0, 0)
-	appendMenuItem(hEngines, checkFlag(ord.CloudProtection > 0), cmdToggleCloud, "Cloud Protection (MAPS)")
-	appendMenuItem(hEngines, checkFlag(ord.SampleSubmission == 1 || ord.SampleSubmission == 3), cmdToggleSamples, "Sample Submission")
-	appendMenuItem(hMenu, mfPopup, hEngines, "Protection Engines")
-
-	// Notification & Tray Controls
-	appendMenuItem(hMenu, checkFlag(ord.SuppressAllNags), cmdToggleSuppressNags, "Silence Security Nags")
-	appendMenuItem(hMenu, checkFlag(ord.MuteWindowsSecSystray), cmdToggleMuteSystray, "Hide Windows Security Tray Icon")
+	// Presets (top-level)
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "quiet-guardian"), cmdPresetQuietGuardian, "Quiet Guardian")
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "dev-workstation"), cmdPresetDevWork, "Developer Workstation")
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "on-demand-only"), cmdPresetOnDemand, "On-Demand Only")
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "full-shield-no-nag"), cmdPresetFullShield, "Full Shield")
 
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
@@ -506,8 +479,6 @@ func (t *AppTray) showContextMenu() {
 }
 
 func (t *AppTray) handleCommand(cmd uint32) {
-	_, ord, _, _, _ := t.gov.Snapshot()
-
 	switch cmd {
 	case cmdOpenDashboard:
 		if t.openDashboard != nil {
@@ -534,47 +505,6 @@ func (t *AppTray) handleCommand(cmd uint32) {
 				break
 			}
 		}
-
-	case cmdToggleRealtime:
-		ord.RealtimeProtection = !ord.RealtimeProtection
-		ord.PresetName = "custom"
-		go t.gov.UpdateOrders(ord)
-	case cmdToggleBehavior:
-		ord.BehaviorMonitoring = !ord.BehaviorMonitoring
-		ord.PresetName = "custom"
-		go t.gov.UpdateOrders(ord)
-	case cmdToggleIOAV:
-		ord.IOAVProtection = !ord.IOAVProtection
-		ord.PresetName = "custom"
-		go t.gov.UpdateOrders(ord)
-	case cmdToggleScript:
-		ord.ScriptScanning = !ord.ScriptScanning
-		ord.PresetName = "custom"
-		go t.gov.UpdateOrders(ord)
-	case cmdToggleCloud:
-		if ord.CloudProtection > 0 {
-			ord.CloudProtection = 0
-		} else {
-			ord.CloudProtection = 2
-		}
-		ord.PresetName = "custom"
-		go t.gov.UpdateOrders(ord)
-	case cmdToggleSamples:
-		if ord.SampleSubmission == 2 {
-			ord.SampleSubmission = 1
-		} else {
-			ord.SampleSubmission = 2
-		}
-		ord.PresetName = "custom"
-		go t.gov.UpdateOrders(ord)
-
-	case cmdToggleSuppressNags:
-		ord.SuppressAllNags = !ord.SuppressAllNags
-		ord.SuppressEnhancedNags = ord.SuppressAllNags
-		go t.gov.UpdateOrders(ord)
-	case cmdToggleMuteSystray:
-		ord.MuteWindowsSecSystray = !ord.MuteWindowsSecSystray
-		go t.gov.UpdateOrders(ord)
 
 	case cmdStandDown15m:
 		go func() {

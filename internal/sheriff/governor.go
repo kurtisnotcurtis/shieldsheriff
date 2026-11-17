@@ -126,7 +126,7 @@ func NewGovernor() *Governor {
 			UpdatedAt:             time.Now(),
 			PresetName:            "unconfigured",
 			Elected:               false,
-			EnforceLoop:           true,
+			EnforceLoop:           false,
 			DriftCheckSeconds:     15,
 			StartupEnabled:        IsTrayStartupEnabled(),
 			CheckUpdatesOnStart:   false,
