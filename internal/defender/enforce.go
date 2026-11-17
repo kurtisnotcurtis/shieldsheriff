@@ -318,6 +318,59 @@ func syncWMIPreferences(effectiveRTP bool, orders StandingOrders) error {
 	return nil
 }
 
+// RevertPolicies removes ShieldSheriff's Group Policy locks and restores the
+// Windows Security tray autorun entry so the system returns to pre-ShieldSheriff defaults.
+func RevertPolicies() EnforceResult {
+	res := EnforceResult{Success: true}
+	if !IsProcessElevated() {
+		res.Success = false
+		res.Warnings = append(res.Warnings, "Administrator privileges required to revert policies")
+		return res
+	}
+
+	const (
+		polRTP        = `SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection`
+		polSpynet     = `SOFTWARE\Policies\Microsoft\Windows Defender\Spynet`
+		polNetProt    = `SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection`
+		polUX         = `SOFTWARE\Policies\Microsoft\Windows Defender\UX Configuration`
+		polWSCNotif   = `SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications`
+		polWSCSystray = `SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray`
+		winRunKey     = `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
+		sheriffBack   = `SOFTWARE\ShieldSheriff\Backup`
+		toastSecKey   = `Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.SecurityAndMaintenance`
+	)
+
+	for _, name := range []string{
+		"DisableRealtimeMonitoring",
+		"DisableBehaviorMonitoring",
+		"DisableIOAVProtection",
+		"DisableScriptScanning",
+		"DisableScanOnRealtimeEnable",
+	} {
+		_ = regDeleteVal(hkeyLocalMachine, polRTP, name)
+	}
+	for _, name := range []string{"SpynetReporting", "SubmitSamplesConsent", "DisableBlockAtFirstSeen"} {
+		_ = regDeleteVal(hkeyLocalMachine, polSpynet, name)
+	}
+	_ = regDeleteVal(hkeyLocalMachine, polNetProt, "EnableNetworkProtection")
+	_ = regDeleteVal(hkeyLocalMachine, polUX, "Notification_Suppress")
+	_ = regDeleteVal(hkeyLocalMachine, polWSCNotif, "DisableNotifications")
+	_ = regDeleteVal(hkeyLocalMachine, polWSCNotif, "DisableEnhancedNotifications")
+	_ = regDeleteVal(hkeyLocalMachine, polWSCSystray, "HideSystray")
+	_ = regWriteDword(hkeyCurrentUser, toastSecKey, "Enabled", 1)
+
+	if _, ok := regReadString(hkeyLocalMachine, winRunKey, "SecurityHealth"); !ok {
+		backupVal, hasBackup := regReadString(hkeyLocalMachine, sheriffBack, "SecurityHealthRun")
+		if !hasBackup || backupVal == "" {
+			backupVal = `%windir%\system32\SecurityHealthSystray.exe`
+		}
+		_ = regWriteString(hkeyLocalMachine, winRunKey, "SecurityHealth", backupVal, regExpandSz)
+	}
+
+	res.Applied = append(res.Applied, "Reverted ShieldSheriff policy overrides (Passive Mode)")
+	return res
+}
+
 // RunQuickScan triggers an on-demand Quick Scan using Defender's native MpCmdRun.exe.
 // This works even when Real-Time Protection is turned OFF!
 func RunQuickScan() (string, error) {

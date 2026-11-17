@@ -72,6 +72,11 @@ func regReadDword(root uintptr, subkey, valueName string) (uint32, bool) {
 	return data, true
 }
 
+// ReadHKCUDword reads a REG_DWORD value from HKEY_CURRENT_USER.
+func ReadHKCUDword(subkey, valueName string) (uint32, bool) {
+	return regReadDword(hkeyCurrentUser, subkey, valueName)
+}
+
 func regReadString(root uintptr, subkey, valueName string) (string, bool) {
 	subkeyPtr, err := syscall.UTF16PtrFromString(subkey)
 	if err != nil {
@@ -194,11 +199,11 @@ func Inspect(orders *StandingOrders, standDown *StandDownState) DeputyStatus {
 	effectiveBoolEngine := func(polKey, liveKey, valName string, defaultEnabled bool) (enabled bool, policyLocked bool) {
 		polVal, hasPol := regReadDword(hkeyLocalMachine, polKey, valName)
 		liveVal, hasLive := regReadDword(hkeyLocalMachine, liveKey, valName)
-		if hasLive {
+		if hasPol && !st.TamperProtectionActive {
 			// Value is named "Disable...", so 0 = Enabled, 1 = Disabled
-			enabled = (liveVal == 0)
-		} else if hasPol && !st.TamperProtectionActive {
 			enabled = (polVal == 0)
+		} else if hasLive {
+			enabled = (liveVal == 0)
 		} else {
 			enabled = defaultEnabled
 		}
@@ -211,24 +216,24 @@ func Inspect(orders *StandingOrders, standDown *StandDownState) DeputyStatus {
 	st.ScriptScanning, _ = effectiveBoolEngine(polRTP, defRTP, "DisableScriptScanning", true)
 
 	// Network Protection (0 = Off, 1 = Enabled, 2 = Audit)
-	if np, ok := regReadDword(hkeyLocalMachine, defNetProt, "EnableNetworkProtection"); ok {
-		st.NetworkProtection = np
-	} else if npPol, okPol := regReadDword(hkeyLocalMachine, polNetProt, "EnableNetworkProtection"); okPol {
+	if npPol, okPol := regReadDword(hkeyLocalMachine, polNetProt, "EnableNetworkProtection"); okPol && !st.TamperProtectionActive {
 		st.NetworkProtection = npPol
+	} else if np, ok := regReadDword(hkeyLocalMachine, defNetProt, "EnableNetworkProtection"); ok {
+		st.NetworkProtection = np
 	}
 
 	// 4. Cloud-Delivered Protection (SpyNetReporting / MAPSReporting) & Sample Submission
-	if cp, ok := regReadDword(hkeyLocalMachine, defSpynet, "SpyNetReporting"); ok {
-		st.CloudProtection = cp
-	} else if cpPol, okPol := regReadDword(hkeyLocalMachine, polSpynet, "SpynetReporting"); okPol {
+	if cpPol, okPol := regReadDword(hkeyLocalMachine, polSpynet, "SpynetReporting"); okPol && !st.TamperProtectionActive {
 		st.CloudProtection = cpPol
+	} else if cp, ok := regReadDword(hkeyLocalMachine, defSpynet, "SpyNetReporting"); ok {
+		st.CloudProtection = cp
 	}
 	_, st.PolicyCloudLocked = regReadDword(hkeyLocalMachine, polSpynet, "SpynetReporting")
 
-	if ss, ok := regReadDword(hkeyLocalMachine, defSpynet, "SubmitSamplesConsent"); ok {
-		st.SampleSubmission = ss
-	} else if ssPol, okPol := regReadDword(hkeyLocalMachine, polSpynet, "SubmitSamplesConsent"); okPol {
+	if ssPol, okPol := regReadDword(hkeyLocalMachine, polSpynet, "SubmitSamplesConsent"); okPol && !st.TamperProtectionActive {
 		st.SampleSubmission = ssPol
+	} else if ss, ok := regReadDword(hkeyLocalMachine, defSpynet, "SubmitSamplesConsent"); ok {
+		st.SampleSubmission = ss
 	} else {
 		st.SampleSubmission = 1 // Windows default is 1 (Send safe samples automatically)
 	}
@@ -275,29 +280,29 @@ func EvaluateCompliance(st DeputyStatus, orders StandingOrders, standDown *Stand
 	}
 	if st.RealtimeProtection != expectedRTP {
 		if expectedRTP {
-			drift = append(drift, "Real-Time Protection is OFF (Standing Order: ON)")
+			drift = append(drift, "Real-Time Protection is OFF (Expected: ON)")
 		} else {
-			drift = append(drift, "Real-Time Protection is ON (Standing Order: OFF)")
+			drift = append(drift, "Real-Time Protection is ON (Expected: OFF)")
 		}
 	}
 
 	if st.BehaviorMonitoring != orders.BehaviorMonitoring {
-		drift = append(drift, fmt.Sprintf("Behavior Monitoring is %s (Standing Order: %s)", onOff(st.BehaviorMonitoring), onOff(orders.BehaviorMonitoring)))
+		drift = append(drift, fmt.Sprintf("Behavior Monitoring is %s (Expected: %s)", onOff(st.BehaviorMonitoring), onOff(orders.BehaviorMonitoring)))
 	}
 	if st.IOAVProtection != orders.IOAVProtection {
-		drift = append(drift, fmt.Sprintf("Downloaded Files/Attachments Scan (IOAV) is %s (Standing Order: %s)", onOff(st.IOAVProtection), onOff(orders.IOAVProtection)))
+		drift = append(drift, fmt.Sprintf("Downloaded Files/Attachments Scan (IOAV) is %s (Expected: %s)", onOff(st.IOAVProtection), onOff(orders.IOAVProtection)))
 	}
 	if st.ScriptScanning != orders.ScriptScanning {
-		drift = append(drift, fmt.Sprintf("Script Scanning is %s (Standing Order: %s)", onOff(st.ScriptScanning), onOff(orders.ScriptScanning)))
+		drift = append(drift, fmt.Sprintf("Script Scanning is %s (Expected: %s)", onOff(st.ScriptScanning), onOff(orders.ScriptScanning)))
 	}
 	if st.NetworkProtection != orders.NetworkProtection {
-		drift = append(drift, fmt.Sprintf("Network Protection is %d (Standing Order: %d)", st.NetworkProtection, orders.NetworkProtection))
+		drift = append(drift, fmt.Sprintf("Network Protection is %d (Expected: %d)", st.NetworkProtection, orders.NetworkProtection))
 	}
 	if st.CloudProtection != orders.CloudProtection {
-		drift = append(drift, fmt.Sprintf("Cloud-Delivered Protection is %s (Standing Order: %s)", cloudLabel(st.CloudProtection), cloudLabel(orders.CloudProtection)))
+		drift = append(drift, fmt.Sprintf("Cloud-Delivered Protection is %s (Expected: %s)", cloudLabel(st.CloudProtection), cloudLabel(orders.CloudProtection)))
 	}
 	if st.SampleSubmission != orders.SampleSubmission {
-		drift = append(drift, fmt.Sprintf("Automatic Sample Submission is %s (Standing Order: %s)", sampleLabel(st.SampleSubmission), sampleLabel(orders.SampleSubmission)))
+		drift = append(drift, fmt.Sprintf("Automatic Sample Submission is %s (Expected: %s)", sampleLabel(st.SampleSubmission), sampleLabel(orders.SampleSubmission)))
 	}
 	if orders.SuppressAllNags && !st.NagsSuppressed {
 		drift = append(drift, "Windows Security Nags are NOT suppressed (DisableNotifications / DisableEnhancedNotifications missing)")

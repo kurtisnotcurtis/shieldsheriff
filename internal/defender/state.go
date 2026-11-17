@@ -48,10 +48,13 @@ type DeputyStatus struct {
 
 // StandingOrders defines the user-elected rules that ShieldSheriff enforces on Windows Defender.
 type StandingOrders struct {
-	UpdatedAt   time.Time `json:"updatedAt"`
-	PresetName  string    `json:"presetName"`
-	Elected     bool      `json:"elected"`     // Whether ShieldSheriff is actively governing
-	EnforceLoop bool      `json:"enforceLoop"` // Automatically revert Windows Update drift
+	UpdatedAt           time.Time `json:"updatedAt"`
+	PresetName          string    `json:"presetName"`
+	Elected             bool      `json:"elected"`             // Whether ShieldSheriff is actively governing
+	EnforceLoop         bool      `json:"enforceLoop"`         // Automatically revert Windows Update drift
+	DriftCheckSeconds   int       `json:"driftCheckSeconds"`   // Auto-heal check interval in seconds (default 60)
+	StartupEnabled      bool      `json:"startupEnabled"`      // Launch ShieldSheriff tray at Windows logon
+	CheckUpdatesOnStart bool      `json:"checkUpdatesOnStart"` // Check GitHub releases on startup
 
 	// Granular Deputy Engine Toggles
 	RealtimeProtection bool   `json:"realtimeProtection"`
@@ -91,6 +94,7 @@ func DefaultStandingOrders() StandingOrders {
 		PresetName:             "quiet-guardian",
 		Elected:                true,
 		EnforceLoop:            true,
+		DriftCheckSeconds:      15,
 		RealtimeProtection:     true,
 		BehaviorMonitoring:     true,
 		IOAVProtection:         true,
@@ -125,7 +129,7 @@ func BuiltinPresets() []Preset {
 		{
 			ID:          "dev-workstation",
 			Name:        "Developer Workstation",
-			Description: "File scan ON, heavy Behavioral & Script hooks OFF for fast builds, Cloud & Sample telemetry OFF, auto stand-down on cargo/msbuild/go.",
+			Description: "File scan ON, heavy Behavioral & Script hooks OFF for fast builds, Cloud & Sample telemetry OFF, auto-pause on cargo/msbuild/go.",
 			Orders: StandingOrders{
 				UpdatedAt:              time.Now(),
 				PresetName:             "dev-workstation",
@@ -146,7 +150,7 @@ func BuiltinPresets() []Preset {
 		},
 		{
 			ID:          "on-demand-only",
-			Name:        "On-Demand Deputy (Zero Background Overhead)",
+			Name:        "On-Demand Only (Zero Background Overhead)",
 			Description: "Real-Time Protection permanently OFF (no 24h auto-reset). Manual scans & signature updates remain active. All nags silenced.",
 			Orders: StandingOrders{
 				UpdatedAt:              time.Now(),
