@@ -32,18 +32,22 @@ shieldsheriff/
 │   │   ├── enforce.go              # Policy locks + live Engine keys + DCOM WMI (MSFT_MpPreference) sync
 │   │   └── elevation.go            # Token elevation check + UAC self-elevation ("runas")
 │   ├── sheriff/
-│   │   ├── config.go               # Persistent Standing Orders storage (%ProgramData%\ShieldSheriff)
-│   │   ├── governor.go             # Drift auto-healer, Stand-Down timer & Win32 Toolhelp32 process watcher
+│   │   ├── config.go               # Persistent config.json storage (%ProgramData%\ShieldSheriff)
+│   │   ├── governor.go             # Drift auto-healer, Pause timer & Win32 Toolhelp32 process watcher
+│   │   ├── startup.go              # Elevated logon Task Scheduler registration (`ShieldSheriff Tray`)
+│   │   ├── update.go               # GitHub Releases update checker
 │   │   └── service.go              # Native Windows Service (SCM) dispatcher & installer
 │   ├── tray/
-│   │   ├── icon.go                 # Procedural 32-bit ARGB ShieldSheriff emblem HICON renderer
+│   │   ├── icon.go                 # Procedural 32-bit ARGB preset, pause, passive & brand HICON renderer
 │   │   └── systray.go              # Native Win32 Shell_NotifyIconW System Tray & popup menu
 │   ├── ui/
-│   │   ├── server.go               # Localhost (127.0.0.1) Command Center server & isolated Edge App launcher
-│   │   ├── window.go               # Win32 EnumWindows / SetForegroundWindow deduplication
-│   │   └── dashboard.html          # Compact two-tab Command Center UI with SVG Sheriff preset cards & diff preview
+│   │   ├── server.go               # Localhost (127.0.0.1) UI server & WebView2 native window host
+│   │   ├── theme.go                # Windows 11 Dark/Light mode, DWM accent & system UI font reader
+│   │   ├── window.go               # Windows 11 Mica/caption chrome, icon & HWND deduplication
+│   │   └── dashboard.html          # Windows 11 Settings-style dual-pane UI with staged Apply Now
 │   └── version/
 │       └── version.go              # CalVer (YYYY.0M.MICRO) release & Defender platform compatibility metadata
+├── build.ps1                       # Reproducible local release build script (`.\build.ps1 -Test`)
 ├── site/                           # Static marketing & comparison website (index.html, styles.css, app.js)
 ├── CHANGELOG.md                    # CalVer release history & Windows Defender evolution log
 ├── VERSION.json                    # Machine-readable CalVer metadata & tested Defender platform matrix
@@ -57,7 +61,8 @@ shieldsheriff/
 
 ### 1. Build
 ```powershell
-go build -o bin\shieldsheriff.exe ./cmd/shieldsheriff
+.\build.ps1 -Test
+# (or: go build -trimpath -ldflags="-s -w" -o bin\shieldsheriff.exe ./cmd/shieldsheriff)
 ```
 
 ### 2. Inspect Live Defender Status & Drift
@@ -76,11 +81,12 @@ go build -o bin\shieldsheriff.exe ./cmd/shieldsheriff
 ```powershell
 .\bin\shieldsheriff.exe
 ```
-- **Sheriff Preset Cards + Granular Overrides:** Choose from 4 illustrated Sheriff presets (**On-Demand Deputy** → **Developer Workstation** → **Quiet Guardian** → **Full Shield**) with live hover-diff preview and per-setting overrides.
+- **Windows 11 Settings-Style UI (WebView2 + Mica):** Adapts automatically to your Windows 11 Dark/Light mode, accent color, and system font. On first run (no `config.json`), ShieldSheriff shows your current PC settings without modifying anything until you stage changes and click **Apply Now** (with one-time consent for logon startup, configurable Auto-Heal interval, and startup update checks).
+- **Three-State System Tray:**
+  - **Preset Mode:** Displays the active preset's shield icon (**On-Demand Only** red `-`, **Developer Workstation** sky-blue `<>`, **Quiet Guardian** blue shield, **Full Shield** green checkmark, or **Custom**).
+  - **Pause Mode:** Amber shield with `||` pause bars when temporarily paused by timer or watched build process.
+  - **Passive Mode:** Hollow slate shield outline when not enforcing (first run or after reverting ShieldSheriff policies).
 - **Single-Instance Locking:** Relaunching focuses the existing Command Center window instead of opening duplicates.
-- **Gold Shield** in the system tray: In compliance & keeping the peace.
-- **Cyan Shield**: Deputy is temporarily standing down (paused by timer or watched build process).
-- **Amber Shield**: Drift detected, Tamper Protection is active, or running unprivileged.
 
 ### 5. Granular CLI Control
 ```powershell
