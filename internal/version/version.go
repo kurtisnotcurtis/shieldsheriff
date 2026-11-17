@@ -3,15 +3,18 @@ package version
 import "fmt"
 
 // CalVer release metadata (YYYY.0M.MICRO) tracking Windows 11 Defender platform evolution.
-const (
+// Version and ReleasedOn can be overridden at build time via -ldflags -X from VERSION.json.
+var (
 	// Version is the current CalVer release of ShieldSheriff.
-	Version = "2026.11.3"
-
-	// Codename identifies the release milestone.
-	Codename = "Peacekeeper"
+	Version = "2026.11.4"
 
 	// ReleasedOn is the ISO-8601 release date (EST/EDT).
-	ReleasedOn = "2026-11-15"
+	ReleasedOn = "2026-11-16"
+)
+
+const (
+	// Codename identifies the release milestone.
+	Codename = "Peacekeeper"
 
 	// TestedWinBuild is the primary Windows 11 build baseline verified against this release.
 	TestedWinBuild = "Windows 11 24H2 / 25H2 (26100.2314+)"

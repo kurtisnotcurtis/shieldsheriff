@@ -70,6 +70,8 @@ jobs:
         shell: pwsh
         run: |
           $ver = "${{ steps.meta.outputs.version }}"
+          $relDate = "${{ steps.meta.outputs.release_date }}"
+          $ldflags = "-s -w -X shieldsheriff/internal/version.Version=$ver -X shieldsheriff/internal/version.ReleasedOn=$relDate"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
 
           foreach ($arch in @("amd64", "arm64")) {
@@ -79,7 +81,7 @@ jobs:
             $env:CGO_ENABLED = "0"
             $env:GOOS = "windows"
             $env:GOARCH = $arch
-            go build -trimpath -ldflags="-s -w" -o "$stage/shiesh.exe" ./cmd/shieldsheriff
+            go build -trimpath -ldflags="$ldflags" -o "$stage/shiesh.exe" ./cmd/shieldsheriff
 
             Copy-Item README.md, LICENSE -Destination $stage
             $zipPath = "dist/shieldsheriff-$ver-windows-$arch.zip"
