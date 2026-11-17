@@ -17,7 +17,10 @@ Machine-readable release and platform compatibility metadata is also maintained 
 
 ---
 
-## [Unreleased]
+## [2026.11.4] (2026-11-16)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
 
 ### Added
 - **Native WebView2 Window & Windows 11 Theme Sync (`internal/ui`):** Replaced `msedge.exe --app` with a pure-Go `go-webview2` host featuring Windows 11 Mica backdrop, rounded corners, matching caption color, live Dark/Light mode + DWM accent sync, and system UI font detection (`SPI_GETNONCLIENTMETRICS`).
