@@ -6,7 +6,17 @@ import (
 )
 
 func TestCreateSheriffBadgeIcon(t *testing.T) {
-	for _, kind := range []BadgeKind{BadgeGold, BadgeStandDown, BadgeWarning} {
+	kinds := []BadgeKind{
+		BadgePassive,
+		BadgePause,
+		BadgePresetOnDemand,
+		BadgePresetDev,
+		BadgePresetQuiet,
+		BadgePresetFull,
+		BadgePresetCustom,
+		BadgeBrand,
+	}
+	for _, kind := range kinds {
 		hIcon := CreateSheriffBadgeIcon(kind)
 		if hIcon == 0 {
 			t.Fatalf("expected non-zero HICON handle for kind %v", kind)
@@ -16,35 +26,46 @@ func TestCreateSheriffBadgeIcon(t *testing.T) {
 
 func TestSheriffBadgeIconAccentColors(t *testing.T) {
 	const size = 32
-	goldPixels := make([]uint32, size*size)
-	standDownPixels := make([]uint32, size*size)
-	warningPixels := make([]uint32, size*size)
-
-	renderSheriffBadgePixels(BadgeGold, size, goldPixels)
-	renderSheriffBadgePixels(BadgeStandDown, size, standDownPixels)
-	renderSheriffBadgePixels(BadgeWarning, size, warningPixels)
-
-	if slices.Equal(goldPixels, standDownPixels) {
-		t.Fatal("expected BadgeGold and BadgeStandDown icons to differ")
+	kinds := []BadgeKind{
+		BadgePassive,
+		BadgePause,
+		BadgePresetOnDemand,
+		BadgePresetDev,
+		BadgePresetQuiet,
+		BadgePresetFull,
+		BadgePresetCustom,
 	}
-	if slices.Equal(goldPixels, warningPixels) {
-		t.Fatal("expected BadgeGold and BadgeWarning icons to differ")
-	}
-	if slices.Equal(standDownPixels, warningPixels) {
-		t.Fatal("expected BadgeStandDown and BadgeWarning icons to differ")
+	rendered := make([][]uint32, len(kinds))
+	for i, k := range kinds {
+		buf := make([]uint32, size*size)
+		renderSheriffBadgePixels(k, size, buf)
+		rendered[i] = buf
 	}
 
-	// Verify exact opaque accent color pixels appear for each state:
-	// Gold: (250, 204, 21) -> 0xFFFACC15
-	// Stand-Down Cyan: (56, 189, 248) -> 0xFF38BDF8
-	// Warning Amber: (251, 146, 60) -> 0xFFFB923C
-	if !slices.Contains(goldPixels, 0xFFFACC15) {
-		t.Fatal("expected BadgeGold icon to contain gold accent pixels (0xFFFACC15)")
+	for i := 0; i < len(rendered); i++ {
+		for j := i + 1; j < len(rendered); j++ {
+			if slices.Equal(rendered[i], rendered[j]) {
+				t.Fatalf("expected badge %v and %v to differ", kinds[i], kinds[j])
+			}
+		}
 	}
-	if !slices.Contains(standDownPixels, 0xFF38BDF8) {
-		t.Fatal("expected BadgeStandDown icon to contain cyan accent pixels (0xFF38BDF8)")
+
+	if !slices.Contains(rendered[0], 0xFF94A3B8) {
+		t.Fatal("expected BadgePassive to contain slate shield outline (0xFF94A3B8)")
 	}
-	if !slices.Contains(warningPixels, 0xFFFB923C) {
-		t.Fatal("expected BadgeWarning icon to contain amber accent pixels (0xFFFB923C)")
+	if !slices.Contains(rendered[1], 0xFFFB923C) {
+		t.Fatal("expected BadgePause to contain amber pause color (0xFFFB923C)")
+	}
+	if !slices.Contains(rendered[2], 0xFFF87171) {
+		t.Fatal("expected BadgePresetOnDemand to contain coral red (0xFFF87171)")
+	}
+	if !slices.Contains(rendered[3], 0xFF60CDFF) {
+		t.Fatal("expected BadgePresetDev to contain sky blue (0xFF60CDFF)")
+	}
+	if !slices.Contains(rendered[4], 0xFF38BDF8) {
+		t.Fatal("expected BadgePresetQuiet to contain cyan shield (0xFF38BDF8)")
+	}
+	if !slices.Contains(rendered[5], 0xFF4ADE80) {
+		t.Fatal("expected BadgePresetFull to contain emerald green (0xFF4ADE80)")
 	}
 }

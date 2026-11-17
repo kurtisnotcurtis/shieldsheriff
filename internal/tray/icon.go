@@ -18,9 +18,14 @@ var (
 type BadgeKind int
 
 const (
-	BadgeGold BadgeKind = iota
-	BadgeStandDown
-	BadgeWarning
+	BadgePassive BadgeKind = iota
+	BadgePause
+	BadgePresetOnDemand
+	BadgePresetDev
+	BadgePresetQuiet
+	BadgePresetFull
+	BadgePresetCustom
+	BadgeBrand
 )
 
 type bitmapInfoHeader struct {
@@ -118,21 +123,6 @@ func CreateSheriffBadgeIcon(kind BadgeKind) uintptr {
 }
 
 func renderSheriffBadgePixels(kind BadgeKind, size int, pixels []uint32) {
-
-	// Accent palette for state indication (0xAARRGGBB)
-	var accR, accG, accB float64
-	switch kind {
-	case BadgeStandDown:
-		// Cyan for Stand-Down (Paused)
-		accR, accG, accB = 56, 189, 248
-	case BadgeWarning:
-		// Amber/Orange for Drift or Unprivileged Warning
-		accR, accG, accB = 251, 146, 60
-	default:
-		// Classic Sheriff Gold
-		accR, accG, accB = 250, 204, 21
-	}
-
 	// Outer shield polygon (32x32 space)
 	shieldPoly := []pt2{
 		{16.0, 2.2},
@@ -145,34 +135,27 @@ func renderSheriffBadgePixels(kind BadgeKind, size int, pixels []uint32) {
 		{4.4, 6.0},
 	}
 
-	// 5-point Sheriff star badge in lower shield
-	var starPoly [10]pt2
-	starCX, starCY := 16.0, 23.6
-	for i := 0; i < 10; i++ {
-		ang := -math.Pi/2 + float64(i)*(math.Pi/5.0)
-		r := 3.2
-		if i%2 == 1 {
-			r = 1.4
-		}
-		starPoly[i] = pt2{starCX + r*math.Cos(ang), starCY + r*math.Sin(ang)}
+	// Centered tilted cowboy hat inset in shield (for BadgeBrand)
+	brandHatCrown := []pt2{
+		{11.6, 17.0},
+		{12.4, 11.4},
+		{15.8, 10.6},
+		{19.8, 10.6},
+		{21.0, 16.4},
+	}
+	brandHatBrim := []pt2{
+		{8.4, 18.8},
+		{9.6, 15.6},
+		{14.5, 15.2},
+		{21.2, 15.0},
+		{23.8, 16.4},
+		{23.4, 18.4},
+		{18.2, 19.6},
+		{13.0, 21.6},
+		{9.2, 21.4},
 	}
 
-	// Stetson hat crown polygon
-	hatCrown := []pt2{
-		{11.4, 11.4},
-		{12.6, 6.8},
-		{16.0, 7.8},
-		{19.4, 6.8},
-		{20.6, 11.4},
-	}
-
-	// Sample color at subpixel (fx, fy)
-	sampleColor := func(fx, fy float64) (r, g, b, a float64) {
-		if !pointInPoly(fx, fy, shieldPoly) {
-			return 0, 0, 0, 0
-		}
-
-		// Check shield outer rim
+	shieldEdgeDist := func(fx, fy float64) float64 {
 		minEdge := 99.0
 		for i := 0; i < len(shieldPoly); i++ {
 			aPt := shieldPoly[i]
@@ -182,75 +165,115 @@ func renderSheriffBadgePixels(kind BadgeKind, size int, pixels []uint32) {
 				minEdge = d
 			}
 		}
-		if minEdge <= 1.25 {
-			return accR, accG, accB, 1.0
-		}
+		return minEdge
+	}
 
-		// Base dark navy shield fill
-		r, g, b = 15, 23, 42
-
-		// Shoulders silhouette
-		if fy >= 19.6 && fy <= 24.5 && math.Abs(fx-16.0) <= 6.2 {
-			dx := (fx - 16.0) / 6.2
-			dy := (fy - 24.5) / 4.9
-			if dx*dx+dy*dy <= 1.0 {
-				r, g, b = 30, 41, 59
+	// Sample color at subpixel (fx, fy)
+	sampleColor := func(fx, fy float64) (r, g, b, a float64) {
+		switch kind {
+		case BadgePassive:
+			// Hollow shield outline (passthrough / not enforcing)
+			if !pointInPoly(fx, fy, shieldPoly) {
+				return 0, 0, 0, 0
 			}
-		}
-
-		// Sheriff Star badge on chest
-		if pointInPoly(fx, fy, starPoly[:]) {
-			return accR, accG, accB, 1.0
-		}
-
-		// Head circle
-		headDist := math.Hypot(fx-16.0, fy-15.2)
-		if headDist <= 4.1 {
-			if headDist >= 3.3 {
-				r, g, b = 148, 163, 184
-			} else {
-				r, g, b = 15, 23, 42
+			d := shieldEdgeDist(fx, fy)
+			if d <= 2.3 {
+				return 148, 163, 184, 1.0
 			}
-		}
+			return 0, 0, 0, 0
 
-		// Cyan Earmuffs (left & right of head)
-		if (fx >= 9.8 && fx <= 12.1 && fy >= 13.0 && fy <= 17.4) ||
-			(fx >= 19.9 && fx <= 22.2 && fy >= 13.0 && fy <= 17.4) {
-			r, g, b = 56, 189, 248
-		}
+		case BadgePause:
+			// Solid amber shield with crisp dark pause bars (||)
+			if !pointInPoly(fx, fy, shieldPoly) {
+				return 0, 0, 0, 0
+			}
+			if (fx >= 11.4 && fx <= 14.2 && fy >= 10.2 && fy <= 21.6) ||
+				(fx >= 17.8 && fx <= 20.6 && fy >= 10.2 && fy <= 21.6) {
+				return 15, 23, 42, 1.0
+			}
+			return 251, 146, 60, 1.0
 
-		// Cyan Blindfold across eyes
-		if fx >= 11.7 && fx <= 20.3 && fy >= 13.7 && fy <= 16.1 {
-			r, g, b = 56, 189, 248
-		}
+		case BadgePresetOnDemand:
+			// Solid coral-red shield with horizontal minus bar (-)
+			if !pointInPoly(fx, fy, shieldPoly) {
+				return 0, 0, 0, 0
+			}
+			if fx >= 9.6 && fx <= 22.4 && fy >= 14.3 && fy <= 17.7 {
+				return 15, 23, 42, 1.0
+			}
+			return 248, 113, 113, 1.0
 
-		// Stetson Hat brim ellipse & crown (drawn over forehead)
-		brimDX := (fx - 16.0) / 7.8
-		brimDY := (fy - 11.8) / 1.6
-		brimD := brimDX*brimDX + brimDY*brimDY
-		if brimD <= 1.0 {
-			if brimD >= 0.52 {
-				return accR, accG, accB, 1.0
+		case BadgePresetDev:
+			// Solid sky-blue shield with < > code brackets
+			if !pointInPoly(fx, fy, shieldPoly) {
+				return 0, 0, 0, 0
+			}
+			dl1 := distToSegment(fx, fy, 13.0, 11.0, 8.6, 15.8)
+			dl2 := distToSegment(fx, fy, 8.6, 15.8, 13.0, 20.6)
+			dr1 := distToSegment(fx, fy, 19.0, 11.0, 23.4, 15.8)
+			dr2 := distToSegment(fx, fy, 23.4, 15.8, 19.0, 20.6)
+			if dl1 <= 1.55 || dl2 <= 1.55 || dr1 <= 1.55 || dr2 <= 1.55 {
+				return 15, 23, 42, 1.0
+			}
+			return 96, 205, 255, 1.0
+
+		case BadgePresetQuiet:
+			// Solid sky-blue shield
+			if !pointInPoly(fx, fy, shieldPoly) {
+				return 0, 0, 0, 0
+			}
+			return 56, 189, 248, 1.0
+
+		case BadgePresetFull:
+			// Solid emerald-green shield with dark checkmark
+			if !pointInPoly(fx, fy, shieldPoly) {
+				return 0, 0, 0, 0
+			}
+			dc1 := distToSegment(fx, fy, 10.2, 16.2, 14.2, 20.2)
+			dc2 := distToSegment(fx, fy, 14.2, 20.2, 22.2, 11.8)
+			if dc1 <= 1.75 || dc2 <= 1.75 {
+				return 15, 23, 42, 1.0
+			}
+			return 74, 222, 128, 1.0
+
+		case BadgePresetCustom:
+			// Rounded dark badge with blue control bars
+			if fx < 3.0 || fx > 29.0 || fy < 3.0 || fy > 29.0 {
+				return 0, 0, 0, 0
+			}
+			if (fy >= 9.0 && fy <= 11.4 && fx >= 7.0 && fx <= 25.0) ||
+				(fy >= 14.8 && fy <= 17.2 && fx >= 7.0 && fx <= 20.0) ||
+				(fy >= 20.6 && fy <= 23.0 && fx >= 7.0 && fx <= 22.5) {
+				return 96, 165, 250, 1.0
 			}
 			return 30, 41, 59, 1.0
 		}
-		if pointInPoly(fx, fy, hatCrown) {
-			minHat := 99.0
-			for i := 0; i < len(hatCrown); i++ {
-				aPt := hatCrown[i]
-				bPt := hatCrown[(i+1)%len(hatCrown)]
-				d := distToSegment(fx, fy, aPt.x, aPt.y, bPt.x, bPt.y)
-				if d < minHat {
-					minHat = d
-				}
-			}
-			if minHat <= 0.85 {
-				return accR, accG, accB, 1.0
-			}
-			return 30, 41, 59, 1.0
-		}
 
-		return r, g, b, 1.0
+		// BadgeBrand: Clean Windows-style dark shield with gold rim and tilted hat with negative crease lines
+		accR, accG, accB := 250.0, 204.0, 21.0
+		if !pointInPoly(fx, fy, shieldPoly) {
+			return 0, 0, 0, 0
+		}
+		if shieldEdgeDist(fx, fy) <= 1.6 {
+			return accR, accG, accB, 1.0
+		}
+		// Rotate point by +7 deg around (16, 16.5) so hat tilts -7 deg
+		const ang = 0.122
+		dx, dy := fx-16.0, fy-16.5
+		rx := 16.0 + dx*math.Cos(ang) - dy*math.Sin(ang)
+		ry := 16.5 + dx*math.Sin(ang) + dy*math.Cos(ang)
+
+		if pointInPoly(rx, ry, brandHatCrown) || pointInPoly(rx, ry, brandHatBrim) {
+			// Negative-space lines: brim-crown seam, top crease, and side pinch
+			if distToSegment(rx, ry, 11.4, 16.8, 21.2, 15.8) <= 0.55 ||
+				distToSegment(rx, ry, 13.2, 12.0, 19.2, 11.0) <= 0.52 ||
+				distToSegment(rx, ry, 17.2, 12.4, 16.4, 13.9) <= 0.48 ||
+				distToSegment(rx, ry, 16.4, 13.9, 18.2, 14.6) <= 0.48 {
+				return 15, 23, 42, 1.0
+			}
+			return accR, accG, accB, 1.0
+		}
+		return 15, 23, 42, 1.0
 	}
 
 	// Render with 3x3 supersampling

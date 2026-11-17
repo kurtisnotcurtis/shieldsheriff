@@ -93,6 +93,7 @@ const (
 	cmdStandDown1h     = 1042
 	cmdStandDown4h     = 1043
 	cmdStandDownResume = 1044
+	cmdPassiveMode     = 1045
 
 	cmdActionQuickScan  = 1050
 	cmdActionSigUpdate  = 1051
@@ -161,9 +162,13 @@ type AppTray struct {
 	openDashboard func()
 	serverURL     string
 	hwnd          uintptr
-	iconGold      uintptr
-	iconStandDown uintptr
-	iconWarn      uintptr
+	iconPassive   uintptr
+	iconPause     uintptr
+	iconOnDemand  uintptr
+	iconDev       uintptr
+	iconQuiet     uintptr
+	iconFull      uintptr
+	iconCustom    uintptr
 	nid           notifyIconDataW
 }
 
@@ -204,9 +209,13 @@ func (t *AppTray) Run() error {
 	defer runtime.UnlockOSThread()
 
 	activeTray = t
-	t.iconGold = CreateSheriffBadgeIcon(BadgeGold)
-	t.iconStandDown = CreateSheriffBadgeIcon(BadgeStandDown)
-	t.iconWarn = CreateSheriffBadgeIcon(BadgeWarning)
+	t.iconPassive = CreateSheriffBadgeIcon(BadgePassive)
+	t.iconPause = CreateSheriffBadgeIcon(BadgePause)
+	t.iconOnDemand = CreateSheriffBadgeIcon(BadgePresetOnDemand)
+	t.iconDev = CreateSheriffBadgeIcon(BadgePresetDev)
+	t.iconQuiet = CreateSheriffBadgeIcon(BadgePresetQuiet)
+	t.iconFull = CreateSheriffBadgeIcon(BadgePresetFull)
+	t.iconCustom = CreateSheriffBadgeIcon(BadgePresetCustom)
 
 	hInst, _, _ := procGetModuleHandleW.Call(0)
 	clsName, _ := syscall.UTF16PtrFromString("ShieldSheriffTrayWndClass")
@@ -239,15 +248,11 @@ func (t *AppTray) Run() error {
 		UID:              1,
 		UFlags:           nifMessage | nifIcon | nifTip,
 		UCallbackMessage: wmTrayCallback,
-		HIcon:            t.iconGold,
+		HIcon:            t.iconPassive,
 	}
 	t.refreshIconAndTip(true)
 
-	startupMsg := "Running in the background. Right-click the shield icon for options or to exit."
-	if t.serverURL != "" {
-		startupMsg = fmt.Sprintf("Command Center running at %s. Right-click the shield icon for options or to exit.", t.serverURL)
-	}
-	t.ShowBalloon("ShieldSheriff Running", startupMsg)
+	t.ShowBalloon("ShieldSheriff", "Running in the system tray. Click to open settings, or right-click for quick actions.")
 
 	var m msg
 	for {
@@ -267,11 +272,22 @@ func (t *AppTray) refreshIconAndTip(initial bool) {
 	st, ord, sd, _, _ := t.gov.Snapshot()
 	var icon uintptr
 	if sd.Active {
-		icon = t.iconStandDown
-	} else if !st.InCompliance || st.TamperProtectionActive {
-		icon = t.iconWarn
+		icon = t.iconPause
+	} else if !ord.Elected {
+		icon = t.iconPassive
 	} else {
-		icon = t.iconGold
+		switch ord.PresetName {
+		case "on-demand-only":
+			icon = t.iconOnDemand
+		case "dev-workstation":
+			icon = t.iconDev
+		case "quiet-guardian":
+			icon = t.iconQuiet
+		case "full-shield-no-nag":
+			icon = t.iconFull
+		default:
+			icon = t.iconCustom
+		}
 	}
 	tip := formatTrayTip(t.serverURL, st, ord, sd)
 
@@ -286,33 +302,36 @@ func (t *AppTray) refreshIconAndTip(initial bool) {
 	procShellNotifyIconW.Call(action, uintptr(unsafe.Pointer(&t.nid)))
 }
 
-func formatTrayTip(serverURL string, st defender.DeputyStatus, ord defender.StandingOrders, sd defender.StandDownState) string {
-	addrSuffix := ""
-	if hostPort := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(serverURL), "http://"), "https://"); hostPort != "" {
-		addrSuffix = " (" + hostPort + ")"
+func presetDisplayName(id string) string {
+	switch id {
+	case "quiet-guardian":
+		return "Quiet Guardian"
+	case "dev-workstation":
+		return "Developer Workstation"
+	case "on-demand-only":
+		return "On-Demand Only"
+	case "full-shield-no-nag":
+		return "Full Shield"
+	default:
+		return "Custom"
 	}
-	if sd.Active {
-		return fmt.Sprintf("ShieldSheriff — Running%s | Standing Down (%s)", addrSuffix, sd.Reason)
-	}
-	if !st.InCompliance || st.TamperProtectionActive {
-		return fmt.Sprintf("ShieldSheriff — Running%s | %d Drift Item(s) | %s", addrSuffix, len(st.DriftItems), ord.PresetName)
-	}
-	rtp := "ON"
-	if !st.RealtimeProtection {
-		rtp = "OFF"
-	}
-	return fmt.Sprintf("ShieldSheriff ★ Running%s | Real-Time: %s | Nags: Silenced", addrSuffix, rtp)
 }
 
-func formatTrayStatusLabel(serverURL string, st defender.DeputyStatus) string {
-	label := "● ShieldSheriff Running"
-	if hostPort := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(serverURL), "http://"), "https://"); hostPort != "" {
-		label = "● Running — " + hostPort
+func formatTrayTip(_ string, st defender.DeputyStatus, ord defender.StandingOrders, sd defender.StandDownState) string {
+	if sd.Active {
+		return fmt.Sprintf("ShieldSheriff: Paused (%s)", sd.Reason)
 	}
-	if st.IsElevated {
-		return label + " (Admin)"
+	if !ord.Elected {
+		return "ShieldSheriff: Passive Mode (Not Enforcing)"
 	}
-	return label + " (Read-Only)"
+	name := presetDisplayName(ord.PresetName)
+	if !st.InCompliance || st.TamperProtectionActive {
+		if st.TamperProtectionActive && len(st.DriftItems) == 0 {
+			return fmt.Sprintf("ShieldSheriff: %s (Tamper Protection On)", name)
+		}
+		return fmt.Sprintf("ShieldSheriff: %s (%d Drift Item(s))", name, len(st.DriftItems))
+	}
+	return fmt.Sprintf("ShieldSheriff: %s", name)
 }
 
 // ShowBalloon displays a subtle tray notification from ShieldSheriff itself.
@@ -412,62 +431,61 @@ func (t *AppTray) showContextMenu() {
 	}
 	defer procDestroyMenu.Call(hMenu)
 
-	appendMenuItem(hMenu, mfString|mfGrayed, 0, formatTrayStatusLabel(t.serverURL, st))
-	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
-
-	appendMenuItem(hMenu, mfString, cmdOpenDashboard, "★ Open ShieldSheriff Command Center")
+	appendMenuItem(hMenu, mfString, cmdOpenDashboard, "Open Dashboard")
 	if !st.IsElevated {
-		appendMenuItem(hMenu, mfString, cmdElevateNow, "⚡ Relaunch as Administrator (Required to Enforce)")
+		appendMenuItem(hMenu, mfString, cmdElevateNow, "Restart as Administrator")
 	}
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
 	// Presets Submenu
 	hPresets, _, _ := procCreatePopupMenu.Call()
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "quiet-guardian"), cmdPresetQuietGuardian, "Quiet Guardian (Real-Time ON, Cloud/Samples/Nags OFF)")
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "dev-workstation"), cmdPresetDevWork, "Developer Workstation (Fast Builds + Auto Stand-Down)")
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "on-demand-only"), cmdPresetOnDemand, "On-Demand Deputy (Real-Time OFF Permanently, No Nags)")
-	appendMenuItem(hPresets, checkFlag(ord.PresetName == "full-shield-no-nag"), cmdPresetFullShield, "Full Local + Cloud Shield (Nag-Free)")
-	appendMenuItem(hMenu, mfPopup, hPresets, "Standing Order Presets")
+	appendMenuItem(hPresets, checkFlag(ord.PresetName == "quiet-guardian"), cmdPresetQuietGuardian, "Quiet Guardian")
+	appendMenuItem(hPresets, checkFlag(ord.PresetName == "dev-workstation"), cmdPresetDevWork, "Developer Workstation")
+	appendMenuItem(hPresets, checkFlag(ord.PresetName == "on-demand-only"), cmdPresetOnDemand, "On-Demand Only")
+	appendMenuItem(hPresets, checkFlag(ord.PresetName == "full-shield-no-nag"), cmdPresetFullShield, "Full Shield")
+	appendMenuItem(hMenu, mfPopup, hPresets, "Presets")
 
-	// Granular Engine Toggles
+	// Protection Engines Submenu
 	hEngines, _, _ := procCreatePopupMenu.Call()
-	appendMenuItem(hEngines, checkFlag(ord.RealtimeProtection), cmdToggleRealtime, "Real-Time File Protection")
+	appendMenuItem(hEngines, checkFlag(ord.RealtimeProtection), cmdToggleRealtime, "Real-Time Protection")
 	appendMenuItem(hEngines, checkFlag(ord.BehaviorMonitoring), cmdToggleBehavior, "Behavior Monitoring")
-	appendMenuItem(hEngines, checkFlag(ord.IOAVProtection), cmdToggleIOAV, "Downloaded Files & Attachments (IOAV)")
+	appendMenuItem(hEngines, checkFlag(ord.IOAVProtection), cmdToggleIOAV, "Downloads & Attachments (IOAV)")
 	appendMenuItem(hEngines, checkFlag(ord.ScriptScanning), cmdToggleScript, "Script Scanning (AMSI)")
 	procAppendMenuW.Call(hEngines, mfSeparator, 0, 0)
-	appendMenuItem(hEngines, checkFlag(ord.CloudProtection > 0), cmdToggleCloud, "Cloud-Delivered Protection (MAPS)")
-	appendMenuItem(hEngines, checkFlag(ord.SampleSubmission == 1 || ord.SampleSubmission == 3), cmdToggleSamples, "Automatic Sample Submission")
-	appendMenuItem(hMenu, mfPopup, hEngines, "Granular Deputy Toggles")
+	appendMenuItem(hEngines, checkFlag(ord.CloudProtection > 0), cmdToggleCloud, "Cloud Protection (MAPS)")
+	appendMenuItem(hEngines, checkFlag(ord.SampleSubmission == 1 || ord.SampleSubmission == 3), cmdToggleSamples, "Sample Submission")
+	appendMenuItem(hMenu, mfPopup, hEngines, "Protection Engines")
 
-	// Keep the Peace (Nag Control)
-	appendMenuItem(hMenu, checkFlag(ord.SuppressAllNags), cmdToggleSuppressNags, "Keep the Peace (Silence All Security Nags)")
-	appendMenuItem(hMenu, checkFlag(ord.MuteWindowsSecSystray), cmdToggleMuteSystray, "Hide Default Windows Security Tray Icon")
+	// Notification & Tray Controls
+	appendMenuItem(hMenu, checkFlag(ord.SuppressAllNags), cmdToggleSuppressNags, "Silence Security Nags")
+	appendMenuItem(hMenu, checkFlag(ord.MuteWindowsSecSystray), cmdToggleMuteSystray, "Hide Windows Security Tray Icon")
 
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
-	// Deputy Stand-Down Submenu
+	// Pause Protection Submenu
 	hStandDown, _, _ := procCreatePopupMenu.Call()
 	if sd.Active {
-		appendMenuItem(hStandDown, mfString|mfChecked, cmdStandDownResume, fmt.Sprintf("Active: %s — Click to Resume Now", sd.Reason))
+		appendMenuItem(hStandDown, mfString|mfChecked, cmdStandDownResume, fmt.Sprintf("Resume Protection (%s)", sd.Reason))
 		procAppendMenuW.Call(hStandDown, mfSeparator, 0, 0)
 	}
-	appendMenuItem(hStandDown, mfString, cmdStandDown15m, "Stand Down for 15 Minutes")
-	appendMenuItem(hStandDown, mfString, cmdStandDown30m, "Stand Down for 30 Minutes")
-	appendMenuItem(hStandDown, mfString, cmdStandDown1h, "Stand Down for 1 Hour")
-	appendMenuItem(hStandDown, mfString, cmdStandDown4h, "Stand Down for 4 Hours")
-	appendMenuItem(hMenu, mfPopup, hStandDown, "Deputy Stand-Down (Temporary Pause)")
+	appendMenuItem(hStandDown, mfString, cmdStandDown15m, "Pause for 15 Minutes")
+	appendMenuItem(hStandDown, mfString, cmdStandDown30m, "Pause for 30 Minutes")
+	appendMenuItem(hStandDown, mfString, cmdStandDown1h, "Pause for 1 Hour")
+	appendMenuItem(hStandDown, mfString, cmdStandDown4h, "Pause for 4 Hours")
+	procAppendMenuW.Call(hStandDown, mfSeparator, 0, 0)
+	appendMenuItem(hStandDown, checkFlag(!ord.Elected), cmdPassiveMode, "Passive Mode (Stop Enforcing)")
+	appendMenuItem(hMenu, mfPopup, hStandDown, "Pause Protection")
 
-	// Deputy Actions Submenu
+	// Tools Submenu
 	hActions, _, _ := procCreatePopupMenu.Call()
-	appendMenuItem(hActions, mfString, cmdActionQuickScan, "Run On-Demand Quick Scan")
-	appendMenuItem(hActions, mfString, cmdActionSigUpdate, "Update Virus Definitions")
+	appendMenuItem(hActions, mfString, cmdActionQuickScan, "Quick Scan")
+	appendMenuItem(hActions, mfString, cmdActionSigUpdate, "Update Definitions")
 	procAppendMenuW.Call(hActions, mfSeparator, 0, 0)
-	appendMenuItem(hActions, mfString, cmdActionOpenWinSec, "Open Windows Security (Tamper Protection Toggle)")
-	appendMenuItem(hMenu, mfPopup, hActions, "Deputy Actions")
+	appendMenuItem(hActions, mfString, cmdActionOpenWinSec, "Open Windows Security")
+	appendMenuItem(hMenu, mfPopup, hActions, "Tools")
 
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
-	appendMenuItem(hMenu, mfString, cmdExit, "Exit ShieldSheriff (Stop Server & Tray)")
+	appendMenuItem(hMenu, mfString, cmdExit, "Exit")
 
 	var pt point
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
@@ -511,7 +529,7 @@ func (t *AppTray) handleCommand(cmd uint32) {
 			if p.ID == targetID {
 				go func(preset defender.Preset) {
 					_, _ = t.gov.UpdateOrders(preset.Orders)
-					t.ShowBalloon("Standing Orders Updated", "Activated preset: "+preset.Name)
+					t.ShowBalloon("Preset Applied", "Switched to "+preset.Name)
 				}(p)
 				break
 			}
@@ -560,35 +578,40 @@ func (t *AppTray) handleCommand(cmd uint32) {
 
 	case cmdStandDown15m:
 		go func() {
-			t.gov.StartStandDown(15*time.Minute, "15m Manual Stand-Down")
-			t.ShowBalloon("Deputy Standing Down", "Real-Time Protection paused for 15 minutes.")
+			t.gov.StartStandDown(15*time.Minute, "15m Pause")
+			t.ShowBalloon("Protection Paused", "Real-Time Protection paused for 15 minutes.")
 		}()
 	case cmdStandDown30m:
 		go func() {
-			t.gov.StartStandDown(30*time.Minute, "30m Manual Stand-Down")
-			t.ShowBalloon("Deputy Standing Down", "Real-Time Protection paused for 30 minutes.")
+			t.gov.StartStandDown(30*time.Minute, "30m Pause")
+			t.ShowBalloon("Protection Paused", "Real-Time Protection paused for 30 minutes.")
 		}()
 	case cmdStandDown1h:
 		go func() {
-			t.gov.StartStandDown(1*time.Hour, "1h Manual Stand-Down")
-			t.ShowBalloon("Deputy Standing Down", "Real-Time Protection paused for 1 hour.")
+			t.gov.StartStandDown(1*time.Hour, "1h Pause")
+			t.ShowBalloon("Protection Paused", "Real-Time Protection paused for 1 hour.")
 		}()
 	case cmdStandDown4h:
 		go func() {
-			t.gov.StartStandDown(4*time.Hour, "4h Manual Stand-Down")
-			t.ShowBalloon("Deputy Standing Down", "Real-Time Protection paused for 4 hours.")
+			t.gov.StartStandDown(4*time.Hour, "4h Pause")
+			t.ShowBalloon("Protection Paused", "Real-Time Protection paused for 4 hours.")
 		}()
 	case cmdStandDownResume:
 		go func() {
 			t.gov.ResumeFromStandDown()
-			t.ShowBalloon("Deputy Back on Duty", "Restored Standing Orders.")
+			t.ShowBalloon("Protection Resumed", "Restored configured protection settings.")
+		}()
+	case cmdPassiveMode:
+		go func() {
+			t.gov.EnterPassiveMode()
+			t.ShowBalloon("Passive Mode", "Stopped enforcing policies and reverted to pre-ShieldSheriff defaults.")
 		}()
 
 	case cmdActionQuickScan:
 		go func() {
-			t.ShowBalloon("Deputy Quick Scan Started", "Running background quick scan via MpCmdRun.exe...")
+			t.ShowBalloon("Quick Scan Started", "Running background quick scan...")
 			if _, err := defender.RunQuickScan(); err == nil {
-				t.ShowBalloon("Deputy Quick Scan Complete", "No threats detected.")
+				t.ShowBalloon("Quick Scan Complete", "No threats detected.")
 			}
 		}()
 	case cmdActionSigUpdate:
