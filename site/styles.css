@@ -1,25 +1,25 @@
 :root {
-  --bg-deep: #070a12;
-  --bg-surface: #0e1422;
-  --bg-card: #131c2e;
-  --bg-card-hover: #19253d;
-  --border: #23314f;
+  --bg-deep: #202020;
+  --bg-surface: #252525;
+  --bg-card: #2b2b2b;
+  --bg-card-hover: #323232;
+  --border: rgba(255, 255, 255, 0.08);
   --border-gold: rgba(250, 204, 21, 0.45);
   --gold: #facc15;
   --gold-bright: #fde047;
   --gold-dim: rgba(250, 204, 21, 0.12);
-  --cyan: #38bdf8;
-  --cyan-dim: rgba(56, 189, 248, 0.12);
-  --green: #22c55e;
-  --green-dim: rgba(34, 197, 94, 0.14);
+  --cyan: #60cdff;
+  --cyan-dim: rgba(96, 205, 255, 0.14);
+  --green: #4ade80;
+  --green-dim: rgba(34, 197, 94, 0.15);
   --amber: #fb923c;
-  --amber-dim: rgba(251, 146, 60, 0.14);
+  --amber-dim: rgba(251, 146, 60, 0.15);
   --red: #f87171;
-  --red-dim: rgba(248, 113, 113, 0.14);
-  --text: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --radius: 14px;
+  --red-dim: rgba(248, 113, 113, 0.15);
+  --text: #ffffff;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --radius: 10px;
 }
 
 * {
@@ -34,11 +34,8 @@ html {
 }
 
 body {
-  font-family: "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, sans-serif;
+  font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, sans-serif;
   background-color: var(--bg-deep);
-  background-image:
-    radial-gradient(circle at 18% 8%, rgba(250, 204, 21, 0.08) 0%, transparent 38%),
-    radial-gradient(circle at 85% 18%, rgba(56, 189, 248, 0.07) 0%, transparent 40%);
   color: var(--text);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -68,9 +65,23 @@ code, pre {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(7, 10, 18, 0.86);
+  background: rgba(32, 32, 32, 0.88);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.hero-screenshot-wrap {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.hero-screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .navbar-inner {

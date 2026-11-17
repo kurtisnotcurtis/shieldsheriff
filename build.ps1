@@ -12,7 +12,7 @@ if ($Test) {
 }
 
 New-Item -ItemType Directory -Force -Path bin | Out-Null
-go build -trimpath -ldflags="-s -w" -o bin\shieldsheriff.exe ./cmd/shieldsheriff
+go build -trimpath -ldflags="-s -w" -o bin\shiesh.exe ./cmd/shieldsheriff
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "Built bin\shieldsheriff.exe"
+Write-Host "Built bin\shiesh.exe"

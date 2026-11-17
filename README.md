@@ -62,24 +62,24 @@ shieldsheriff/
 ### 1. Build
 ```powershell
 .\build.ps1 -Test
-# (or: go build -trimpath -ldflags="-s -w" -o bin\shieldsheriff.exe ./cmd/shieldsheriff)
+# (or: go build -trimpath -ldflags="-s -w" -o bin\shiesh.exe ./cmd/shieldsheriff)
 ```
 
 ### 2. Inspect Live Defender Status & Drift
 ```powershell
-.\bin\shieldsheriff.exe status
+.\bin\shiesh.exe status
 ```
 
 ### 3. Elect ShieldSheriff & Enforce Standing Orders (Requires Admin / UAC)
 *(Note: Ensure **Tamper Protection** is toggled `OFF` once in `windowsdefender://threatsettings` so Defender honors local policy locks.)*
 ```powershell
 # Apply the default "Quiet Guardian" preset (Real-Time ON, Cloud OFF, Sample Submission OFF, Nags Silenced)
-.\bin\shieldsheriff.exe elect --elevate
+.\bin\shiesh.exe elect --elevate
 ```
 
 ### 4. Launch the System Tray Shield & Command Center UI
 ```powershell
-.\bin\shieldsheriff.exe
+.\bin\shiesh.exe
 ```
 - **Windows 11 Settings-Style UI (WebView2 + Mica):** Adapts automatically to your Windows 11 Dark/Light mode, accent color, and system font. On first run (no `config.json`), ShieldSheriff shows your current PC settings without modifying anything until you stage changes and click **Apply Now** (with one-time consent for logon startup, configurable Auto-Heal interval, and startup update checks).
 - **Three-State System Tray:**
@@ -91,19 +91,19 @@ shieldsheriff/
 ### 5. Granular CLI Control
 ```powershell
 # Keep Real-Time ON, turn Behavior/Script scanning OFF, Cloud & Sample uploads OFF, and silence all nags:
-.\bin\shieldsheriff.exe order realtime=on behavior=off script=off cloud=off samples=never nags=off
+.\bin\shiesh.exe order realtime=on behavior=off script=off cloud=off samples=never nags=off
 
 # Automatically pause Real-Time Protection whenever cargo.exe or msbuild.exe is running:
-.\bin\shieldsheriff.exe order watch=cargo.exe,msbuild.exe
+.\bin\shiesh.exe order watch=cargo.exe,msbuild.exe
 
 # Manually pause Real-Time Protection for 30 minutes, then auto-resume:
-.\bin\shieldsheriff.exe standdown 30
+.\bin\shiesh.exe standdown 30
 
 # Install as a 24/7 background SYSTEM Windows Service across reboots:
-.\bin\shieldsheriff.exe service install
+.\bin\shiesh.exe service install
 
 # Inspect CalVer release & tested Windows Defender platform compatibility:
-.\bin\shieldsheriff.exe version
+.\bin\shiesh.exe version
 ```
 
 ---

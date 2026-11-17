@@ -21,7 +21,7 @@ func IsTrayStartupEnabled() bool {
 	return hiddenCmd("schtasks.exe", "/Query", "/TN", trayStartupTaskName).Run() == nil
 }
 
-// SetTrayStartup creates or removes the elevated logon task that launches `shieldsheriff.exe tray`.
+// SetTrayStartup creates or removes the elevated logon task that launches `shiesh.exe tray`.
 func SetTrayStartup(enabled bool) error {
 	if !enabled {
 		out, err := hiddenCmd("schtasks.exe", "/Delete", "/TN", trayStartupTaskName, "/F").CombinedOutput()
