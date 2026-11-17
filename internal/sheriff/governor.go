@@ -85,31 +85,72 @@ func FindRunningWatchedProcess(watchList []string) string {
 // Governor coordinates StandingOrders, live DeputyStatus inspection, drift auto-healing,
 // and temporary Stand-Down timers/process watches.
 type Governor struct {
-	mu          sync.RWMutex
-	orders      defender.StandingOrders
-	configPath  string
-	standDown   defender.StandDownState
-	lastStatus  defender.DeputyStatus
-	auditLog    []AuditEntry
-	onStateSync func(defender.DeputyStatus, defender.StandingOrders, defender.StandDownState)
-	stopCh      chan struct{}
+	mu             sync.RWMutex
+	orders         defender.StandingOrders
+	configPath     string
+	firstRun       bool
+	standDown      defender.StandDownState
+	lastStatus     defender.DeputyStatus
+	lastDriftCheck time.Time
+	updateInfo     UpdateInfo
+	auditLog       []AuditEntry
+	onStateSync    func(defender.DeputyStatus, defender.StandingOrders, defender.StandDownState)
+	stopCh         chan struct{}
 }
 
 // NewGovernor creates and initializes a Governor instance.
 func NewGovernor() *Governor {
 	orders, path, err := LoadOrders()
+	firstRun := false
+	if err != nil {
+		firstRun = true
+		orders.Elected = false
+	}
+	if orders.DriftCheckSeconds <= 0 {
+		orders.DriftCheckSeconds = 15
+	}
 	g := &Governor{
 		orders:     orders,
 		configPath: path,
+		firstRun:   firstRun,
 		stopCh:     make(chan struct{}),
 	}
-	if err != nil {
-		g.addAuditLocked("INIT", "Initialized default Quiet Guardian standing orders")
+	if firstRun {
+		g.addAuditLocked("INIT", "First run detected; awaiting user selection before modifying Defender")
 	} else {
 		g.addAuditLocked("INIT", fmt.Sprintf("Loaded Standing Orders (%s) from %s", orders.PresetName, path))
 	}
 	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
+	if firstRun {
+		g.orders = defender.StandingOrders{
+			UpdatedAt:             time.Now(),
+			PresetName:            "unconfigured",
+			Elected:               false,
+			EnforceLoop:           true,
+			DriftCheckSeconds:     15,
+			StartupEnabled:        IsTrayStartupEnabled(),
+			CheckUpdatesOnStart:   false,
+			RealtimeProtection:    g.lastStatus.RealtimeProtection,
+			BehaviorMonitoring:    g.lastStatus.BehaviorMonitoring,
+			IOAVProtection:        g.lastStatus.IOAVProtection,
+			ScriptScanning:        g.lastStatus.ScriptScanning,
+			NetworkProtection:     g.lastStatus.NetworkProtection,
+			CloudProtection:       g.lastStatus.CloudProtection,
+			SampleSubmission:      g.lastStatus.SampleSubmission,
+			SuppressAllNags:       g.lastStatus.NagsSuppressed,
+			SuppressEnhancedNags:  g.lastStatus.EnhancedNagsSuppressed,
+			MuteWindowsSecSystray: g.lastStatus.SecurityTrayIconMuted,
+		}
+		g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
+	}
 	return g
+}
+
+// IsFirstRun reports whether ShieldSheriff is awaiting initial user setup/consent.
+func (g *Governor) IsFirstRun() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.firstRun || !g.orders.Elected
 }
 
 func (g *Governor) addAuditLocked(category, msg string) {
@@ -134,20 +175,56 @@ func (g *Governor) SetOnStateSync(fn func(defender.DeputyStatus, defender.Standi
 // Snapshot returns a thread-safe copy of the current status, orders, stand-down state, and audit log.
 func (g *Governor) Snapshot() (defender.DeputyStatus, defender.StandingOrders, defender.StandDownState, []AuditEntry, string) {
 	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
+	st := defender.Inspect(&g.orders, &g.standDown)
+	st, healed := g.healDriftLocked(st)
+	g.lastStatus = st
 	logs := make([]AuditEntry, len(g.auditLog))
 	copy(logs, g.auditLog)
-	return g.lastStatus, g.orders, g.standDown, logs, g.configPath
+	ord := g.orders
+	sd := g.standDown
+	cfg := g.configPath
+	cb := g.onStateSync
+	g.mu.Unlock()
+
+	if healed && cb != nil {
+		cb(st, ord, sd)
+	}
+	return st, ord, sd, logs, cfg
+}
+
+func (g *Governor) healDriftLocked(st defender.DeputyStatus) (defender.DeputyStatus, bool) {
+	if g.orders.Elected && g.orders.EnforceLoop && !st.InCompliance && st.IsElevated && !st.TamperProtectionActive {
+		res := defender.Enforce(g.orders, &g.standDown)
+		if res.Success {
+			g.addAuditLocked("DRIFT", fmt.Sprintf("Auto-healed configuration drift (%s)", strings.Join(st.DriftItems, ", ")))
+			return defender.Inspect(&g.orders, &g.standDown), true
+		}
+	}
+	return st, false
 }
 
 // UpdateOrders saves and enforces new StandingOrders.
 func (g *Governor) UpdateOrders(orders defender.StandingOrders) (defender.EnforceResult, error) {
 	g.mu.Lock()
+	if orders.DriftCheckSeconds <= 0 {
+		orders.DriftCheckSeconds = 15
+	}
+	prevStartup := g.orders.StartupEnabled
+	orders.Elected = true
+	g.firstRun = false
 	g.orders = orders
 	path, saveErr := SaveOrders(g.orders)
 	g.configPath = path
 	res := defender.Enforce(g.orders, &g.standDown)
+	if defender.IsProcessElevated() && orders.StartupEnabled != prevStartup {
+		if err := SetTrayStartup(orders.StartupEnabled); err != nil {
+			res.Warnings = append(res.Warnings, err.Error())
+		} else if orders.StartupEnabled {
+			g.addAuditLocked("STARTUP", "Enabled ShieldSheriff tray launch at Windows logon")
+		} else {
+			g.addAuditLocked("STARTUP", "Disabled ShieldSheriff tray launch at Windows logon")
+		}
+	}
 	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
 	if res.Success {
 		g.addAuditLocked("ENFORCE", fmt.Sprintf("Applied Standing Orders (%s): %d policies enforced", orders.PresetName, len(res.Applied)))
@@ -175,6 +252,28 @@ func (g *Governor) EnforceNow() defender.EnforceResult {
 	} else if len(res.Warnings) > 0 {
 		g.addAuditLocked("WARN", strings.Join(res.Warnings, "; "))
 	}
+	cb := g.onStateSync
+	st := g.lastStatus
+	ord := g.orders
+	sd := g.standDown
+	g.mu.Unlock()
+
+	if cb != nil {
+		cb(st, ord, sd)
+	}
+	return res
+}
+
+// EnterPassiveMode stops enforcing policies and reverts ShieldSheriff's policy overrides.
+func (g *Governor) EnterPassiveMode() defender.EnforceResult {
+	g.mu.Lock()
+	g.standDown = defender.StandDownState{}
+	g.orders.Elected = false
+	g.orders.PresetName = "passive"
+	_, _ = SaveOrders(g.orders)
+	res := defender.RevertPolicies()
+	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
+	g.addAuditLocked("PASSIVE", "Entered Passive Mode (reverted policy overrides; passthrough)")
 	cb := g.onStateSync
 	st := g.lastStatus
 	ord := g.orders
@@ -247,6 +346,28 @@ func (g *Governor) StartLoop() {
 	}()
 }
 
+// CheckForUpdates queries GitHub for a newer ShieldSheriff release and caches the result.
+func (g *Governor) CheckForUpdates() UpdateInfo {
+	info := CheckLatestRelease()
+	g.mu.Lock()
+	g.updateInfo = info
+	if info.Error != "" {
+		g.addAuditLocked("UPDATE", "Update check failed: "+info.Error)
+	} else if info.Available {
+		g.addAuditLocked("UPDATE", fmt.Sprintf("Update available: v%s (current v%s)", info.LatestVersion, info.CurrentVersion))
+	} else {
+		g.addAuditLocked("UPDATE", fmt.Sprintf("Up to date (v%s)", info.CurrentVersion))
+	}
+	g.mu.Unlock()
+	return info
+}
+
+// GetUpdateInfo returns the most recent cached update check result.
+func (g *Governor) GetUpdateInfo() UpdateInfo {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.updateInfo
+}
 // StopLoop stops the background watcher loop.
 func (g *Governor) StopLoop() {
 	select {
@@ -291,19 +412,24 @@ func (g *Governor) tick() {
 		}
 	}
 
-	// 3. Inspect live state & heal drift if Elected + EnforceLoop + Elevated
-	st := defender.Inspect(&g.orders, &g.standDown)
-	if g.orders.Elected && g.orders.EnforceLoop && !st.InCompliance && st.IsElevated && !st.TamperProtectionActive {
-		res := defender.Enforce(g.orders, &g.standDown)
-		if res.Success {
-			g.addAuditLocked("DRIFT", fmt.Sprintf("Auto-healed configuration drift (%s)", strings.Join(st.DriftItems, ", ")))
-			st = defender.Inspect(&g.orders, &g.standDown)
+	// 3. Inspect live state & heal drift at configured interval if Elected + EnforceLoop + Elevated
+	driftInterval := time.Duration(g.orders.DriftCheckSeconds) * time.Second
+	if driftInterval < 10*time.Second {
+		driftInterval = 15 * time.Second
+	}
+	st := g.lastStatus
+	prevCompliance := st.InCompliance
+	if now.Sub(g.lastDriftCheck) >= driftInterval {
+		g.lastDriftCheck = now
+		st = defender.Inspect(&g.orders, &g.standDown)
+		var healed bool
+		st, healed = g.healDriftLocked(st)
+		if healed {
 			stateChanged = true
 		}
+		g.lastStatus = st
 	}
 
-	prevCompliance := g.lastStatus.InCompliance
-	g.lastStatus = st
 	cb := g.onStateSync
 	ord := g.orders
 	sd := g.standDown

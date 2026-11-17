@@ -15,7 +15,7 @@ go.work.sum
 .build-cache/
 
 # Local runtime config (if run from working directory)
-standing_orders.json
+config.json
 
 # IDE & Editor directories
 .vscode/

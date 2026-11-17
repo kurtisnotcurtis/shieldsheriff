@@ -23,17 +23,18 @@ import (
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		runInteractive(true, false)
+		runInteractive(true, false, false)
 		return
 	}
 
 	cmd := strings.ToLower(args[0])
 	replace := hasFlag(args[1:], "--replace")
+	noElevate := hasFlag(args[1:], "--no-elevate")
 	switch cmd {
 	case "tray", "--minimized":
-		runInteractive(false, replace)
+		runInteractive(false, replace, noElevate)
 	case "ui", "dashboard":
-		runInteractive(true, replace)
+		runInteractive(true, replace, noElevate)
 	case "status":
 		runStatus(args[1:])
 	case "elect", "enforce":
@@ -70,7 +71,7 @@ func hasFlag(args []string, flag string) bool {
 	return false
 }
 
-func runInteractive(openWindowOnStart bool, replaceExisting bool) {
+func runInteractive(openWindowOnStart bool, replaceExisting bool, noElevate bool) {
 	suppressOwnedConsoleWindow()
 
 	const instanceMutexName = `Local\ShieldSheriffCommandCenterInstance`
@@ -105,9 +106,19 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool) {
 		defer release()
 	}
 
+	if !defender.IsProcessElevated() && !noElevate {
+		mode := "ui"
+		if !openWindowOnStart {
+			mode = "tray"
+		}
+		if err := defender.RelaunchElevated([]string{mode, "--replace", "--no-elevate"}); err == nil {
+			return
+		}
+	}
+
 	gov := sheriff.NewGovernor()
-	st, _, _, _, _ := gov.Snapshot()
-	if st.IsElevated && !st.TamperProtectionActive {
+	st, ord, _, _, _ := gov.Snapshot()
+	if ord.Elected && st.IsElevated && !st.TamperProtectionActive {
 		gov.EnforceNow()
 	}
 	gov.StartLoop()
@@ -132,6 +143,15 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool) {
 	})
 	appTray.SetServerURL(srv.URL())
 	srv.SetOnShutdown(appTray.Quit)
+
+	if ord.Elected && ord.CheckUpdatesOnStart {
+		go func() {
+			info := gov.CheckForUpdates()
+			if info.Available {
+				appTray.ShowBalloon("ShieldSheriff Update Available", fmt.Sprintf("Version v%s is available (current v%s).", info.LatestVersion, info.CurrentVersion))
+			}
+		}()
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)

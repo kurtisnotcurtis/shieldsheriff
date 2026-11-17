@@ -16,15 +16,17 @@ type AuditEntry struct {
 	Message   string    `json:"message"`
 }
 
-// ConfigPath returns the path to standing_orders.json.
-// Prefers %ProgramData%\ShieldSheriff\standing_orders.json if it exists or if elevated,
-// falling back to %LOCALAPPDATA%\ShieldSheriff\standing_orders.json.
+const configFileName = "config.json"
+
+// ConfigPath returns the path to config.json.
+// Prefers %ProgramData%\ShieldSheriff\config.json if it exists or if elevated,
+// falling back to %LOCALAPPDATA%\ShieldSheriff\config.json.
 func ConfigPath() string {
 	progData := os.Getenv("ProgramData")
 	if progData == "" {
 		progData = `C:\ProgramData`
 	}
-	sysPath := filepath.Join(progData, "ShieldSheriff", "standing_orders.json")
+	sysPath := filepath.Join(progData, "ShieldSheriff", configFileName)
 
 	if defender.IsProcessElevated() {
 		return sysPath
@@ -35,17 +37,16 @@ func ConfigPath() string {
 
 	localApp := os.Getenv("LOCALAPPDATA")
 	if localApp != "" {
-		return filepath.Join(localApp, "ShieldSheriff", "standing_orders.json")
+		return filepath.Join(localApp, "ShieldSheriff", configFileName)
 	}
 	exe, err := os.Executable()
 	if err == nil {
-		return filepath.Join(filepath.Dir(exe), "standing_orders.json")
+		return filepath.Join(filepath.Dir(exe), configFileName)
 	}
-	return "standing_orders.json"
+	return configFileName
 }
 
-// LoadOrders reads StandingOrders from disk, or initializes orders matching the user's
-// current intent (DefaultStandingOrders) if no config file exists yet.
+// LoadOrders reads config.json from disk, or initializes defaults if no config file exists yet.
 func LoadOrders() (defender.StandingOrders, string, error) {
 	path := ConfigPath()
 	data, err := os.ReadFile(path)
@@ -61,7 +62,7 @@ func LoadOrders() (defender.StandingOrders, string, error) {
 	return orders, path, nil
 }
 
-// SaveOrders writes StandingOrders atomically to disk.
+// SaveOrders writes config.json to disk.
 func SaveOrders(orders defender.StandingOrders) (string, error) {
 	orders.UpdatedAt = time.Now()
 	path := ConfigPath()
@@ -69,7 +70,7 @@ func SaveOrders(orders defender.StandingOrders) (string, error) {
 		// Fallback to LOCALAPPDATA if ProgramData is not writable
 		localApp := os.Getenv("LOCALAPPDATA")
 		if localApp != "" {
-			path = filepath.Join(localApp, "ShieldSheriff", "standing_orders.json")
+			path = filepath.Join(localApp, "ShieldSheriff", configFileName)
 			_ = os.MkdirAll(filepath.Dir(path), 0755)
 		}
 	}
