@@ -28,16 +28,17 @@ var dashboardHTML []byte
 
 // Server hosts the local ShieldSheriff Command Center UI on 127.0.0.1.
 type Server struct {
-	gov        *sheriff.Governor
-	addr       string
-	url        string
-	ln         net.Listener
-	httpSrv    *http.Server
-	onShutdown func()
-	openMu     sync.Mutex
-	lastOpen   time.Time
-	activeWV   webview2.WebView
-	activeHWND uintptr
+	gov            *sheriff.Governor
+	addr           string
+	url            string
+	ln             net.Listener
+	httpSrv        *http.Server
+	onShutdown     func()
+	onWindowClosed func()
+	openMu         sync.Mutex
+	lastOpen       time.Time
+	activeWV       webview2.WebView
+	activeHWND     uintptr
 }
 
 // StartServer starts the local loopback Command Center HTTP server.
@@ -72,7 +73,25 @@ func StartServer(gov *sheriff.Governor, preferredPort int) (*Server, error) {
 
 // SetOnShutdown registers a callback used when the server initiates a process shutdown (e.g. UAC relaunch).
 func (s *Server) SetOnShutdown(fn func()) {
+	s.openMu.Lock()
 	s.onShutdown = fn
+	s.openMu.Unlock()
+}
+
+// SetOnWindowClosed registers a callback invoked after an opened Command Center window closes.
+func (s *Server) SetOnWindowClosed(fn func()) {
+	s.openMu.Lock()
+	s.onWindowClosed = fn
+	s.openMu.Unlock()
+}
+
+func (s *Server) notifyWindowClosed() {
+	s.openMu.Lock()
+	fn := s.onWindowClosed
+	s.openMu.Unlock()
+	if fn != nil {
+		fn()
+	}
 }
 
 // Shutdown gracefully stops the Command Center HTTP server.
@@ -189,6 +208,7 @@ func (s *Server) OpenWindow() {
 			s.activeHWND = 0
 		}
 		s.openMu.Unlock()
+		s.notifyWindowClosed()
 	}()
 }
 
@@ -207,6 +227,8 @@ func (s *Server) openEdgeFallback(url string) {
 		if _, err := os.Stat(p); err == nil {
 			cmd := exec.Command(p, args...)
 			if err := cmd.Start(); err == nil {
+				_ = cmd.Wait()
+				s.notifyWindowClosed()
 				return
 			}
 		}
@@ -337,8 +359,11 @@ func (s *Server) handleElevate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "message": "Launched elevated ShieldSheriff instance"})
 	go func() {
 		time.Sleep(600 * time.Millisecond)
-		if s.onShutdown != nil {
-			s.onShutdown()
+		s.openMu.Lock()
+		fn := s.onShutdown
+		s.openMu.Unlock()
+		if fn != nil {
+			fn()
 			return
 		}
 		os.Exit(0)

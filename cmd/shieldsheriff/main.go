@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,18 +24,18 @@ import (
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		runInteractive(true, false, false)
+		runStatus(nil)
+		fmt.Println("  Launch UI / Tray : shieldsheriff ui [--elevate]  |  shieldsheriff tray [--elevate]")
+		fmt.Println("  All Commands     : shieldsheriff help")
 		return
 	}
 
-	cmd := strings.ToLower(args[0])
-	replace := hasFlag(args[1:], "--replace")
-	noElevate := hasFlag(args[1:], "--no-elevate")
+	cmd, opts := parseInteractiveCommand(args)
 	switch cmd {
 	case "tray", "--minimized":
-		runInteractive(false, replace, noElevate)
+		runInteractive(false, opts.replace, opts.elevate)
 	case "ui", "dashboard":
-		runInteractive(true, replace, noElevate)
+		runInteractive(true, opts.replace, opts.elevate)
 	case "status":
 		runStatus(args[1:])
 	case "elect", "enforce":
@@ -62,6 +63,23 @@ func main() {
 	}
 }
 
+type interactiveOptions struct {
+	replace bool
+	elevate bool
+}
+
+func parseInteractiveCommand(args []string) (string, interactiveOptions) {
+	if len(args) == 0 {
+		return "", interactiveOptions{}
+	}
+	cmd := strings.ToLower(args[0])
+	opts := interactiveOptions{
+		replace: hasFlag(args[1:], "--replace"),
+		elevate: (hasFlag(args, "--elevate") || hasFlag(args, "-e")) && !hasFlag(args[1:], "--no-elevate"),
+	}
+	return cmd, opts
+}
+
 func hasFlag(args []string, flag string) bool {
 	for _, a := range args {
 		if strings.EqualFold(a, flag) {
@@ -71,7 +89,7 @@ func hasFlag(args []string, flag string) bool {
 	return false
 }
 
-func runInteractive(openWindowOnStart bool, replaceExisting bool, noElevate bool) {
+func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bool) {
 	suppressOwnedConsoleWindow()
 
 	const instanceMutexName = `Local\ShieldSheriffCommandCenterInstance`
@@ -106,19 +124,28 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, noElevate bool
 		defer release()
 	}
 
-	if !defender.IsProcessElevated() && !noElevate {
+	if !defender.IsProcessElevated() && wantElevate {
 		mode := "ui"
 		if !openWindowOnStart {
 			mode = "tray"
 		}
-		if err := defender.RelaunchElevated([]string{mode, "--replace", "--no-elevate"}); err == nil {
+		if err := defender.RelaunchElevated([]string{mode, "--replace"}); err == nil {
 			return
 		}
 	}
 
 	gov := sheriff.NewGovernor()
 	st, ord, _, _, _ := gov.Snapshot()
-	if ord.Elected && st.IsElevated && !st.TamperProtectionActive {
+	if !st.IsElevated {
+		if !openWindowOnStart {
+			fmt.Fprintln(os.Stderr, "System Tray mode requires Administrator privileges. Run `shieldsheriff tray --elevate` (or launch from an elevated shell).")
+			os.Exit(1)
+		}
+		runReadOnlyUI(gov, preferredPort)
+		return
+	}
+
+	if ord.Elected && !st.TamperProtectionActive {
 		gov.EnforceNow()
 	}
 	gov.StartLoop()
@@ -172,6 +199,44 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, noElevate bool
 		fmt.Fprintf(os.Stderr, "System tray error: %v\n", trayErr)
 		os.Exit(1)
 	}
+}
+
+func runReadOnlyUI(gov *sheriff.Governor, preferredPort int) {
+	srv, err := ui.StartServer(gov, preferredPort)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start Command Center UI server: %v\n", err)
+		os.Exit(1)
+	}
+
+	doneCh := make(chan struct{})
+	var closeOnce sync.Once
+	closeDone := func() {
+		closeOnce.Do(func() {
+			close(doneCh)
+		})
+	}
+
+	srv.SetOnShutdown(closeDone)
+	srv.SetOnWindowClosed(closeDone)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	go func() {
+		select {
+		case <-sigCh:
+			closeDone()
+		case <-doneCh:
+		}
+	}()
+
+	fmt.Printf("★ ShieldSheriff Command Center (Read-Only) running at %s\n", srv.URL())
+	srv.OpenWindow()
+
+	<-doneCh
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	_ = srv.Shutdown(shutdownCtx)
+	cancel()
 }
 
 func runStatus(args []string) {
@@ -488,8 +553,9 @@ func runVersion(args []string) {
 func printUsage() {
 	fmt.Printf("ShieldSheriff v%s (%s) — Put Windows Defender Under Your Command\n\n", version.Version, version.Codename)
 	fmt.Println(`Usage:
-  shieldsheriff                         Launch System Tray Star + Command Center UI
-  shieldsheriff tray                    Launch in System Tray only (minimized)
+  shieldsheriff                         Inspect live Defender status (read-only) and exit
+  shieldsheriff ui [--elevate]          Launch Command Center UI (Read-Only window without tray unless --elevate)
+  shieldsheriff tray [--elevate]        Launch persistent System Tray (requires elevation / --elevate)
   shieldsheriff status [--json]         Inspect live Defender status, Tamper Protection & Drift
   shieldsheriff elect [--preset <id>]   Apply Standing Orders (use --elevate for UAC prompt)
   shieldsheriff order <k>=<v> ...       Configure granular Standing Orders

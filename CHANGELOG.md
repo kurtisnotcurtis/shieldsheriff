@@ -17,6 +17,19 @@ Machine-readable release and platform compatibility metadata is also maintained 
 
 ---
 
+## [2026.11.6] (2026-11-17)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
+
+### Changed
+- **Read-Only CLI Default (`cmd/shieldsheriff/main.go`):** Running `shiesh.exe` without arguments now prints live Defender status in Read-Only mode and exits `0` immediately (avoiding UAC/resident-process flags in WinGet validation); pass `ui [--elevate]` or `tray [--elevate]` for interactive/persistent modes.
+- **Window-Bound Read-Only UI (`cmd/shieldsheriff/main.go`, `internal/ui/server.go`):** Unprivileged `ui` launches no longer start a persistent system tray icon or background governance loop and exit cleanly when the window closes; `tray` mode now requires Administrator privileges (`tray --elevate`).
+- **Local Build Script (`build.ps1`):** Added pre-build `shiesh.exe` lock/process detection (`-StopRunning`), terminating error throws on failures, and `bin\ShieldSheriff.lnk` (`ui --elevate`) shortcut generation.
+- **Site Polish (`site/`):** Removed em-dashes, shortened page title, and improved preview image scaling.
+
+---
+
 ## [2026.11.5] (2026-11-16)
 
 * **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)

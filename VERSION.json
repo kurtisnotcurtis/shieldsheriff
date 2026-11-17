@@ -1,8 +1,8 @@
 {
-  "version": "2026.11.5",
+  "version": "2026.11.6",
   "scheme": "CalVer (YYYY.0M.MICRO)",
   "codename": "Peacekeeper",
-  "releasedOn": "2026-11-16",
+  "releasedOn": "2026-11-17",
   "timezone": "America/New_York",
   "rationale": "Windows Defender (MsMpEng.exe / WdFilter.sys) and Windows Security Center (SecurityHealthService.exe) evolve on Microsoft's monthly Patch Tuesday and Windows 11 24H2/25H2 cumulative release cadence rather than traditional semantic API contracts. CalVer (YYYY.0M.MICRO) immediately communicates which Windows 11 cumulative update wave and Defender platform version a release targets.",
   "compatibility": {
@@ -19,6 +19,15 @@
     }
   },
   "releases": [
+    {
+      "version": "2026.11.6",
+      "tag": "v2026.11.6",
+      "codename": "Peacekeeper",
+      "date": "2026-11-17",
+      "windowsBaseline": "Windows 11 24H2 / 25H2 (26100.2314+)",
+      "defenderPlatform": "4.18.26100.5",
+      "summary": "Default no-arg shiesh.exe to read-only CLI status exit 0 for WinGet compatibility, make Read-Only ui window-bound without a persistent tray, require elevation for tray mode, and harden build.ps1 with lock detection and ShieldSheriff.lnk generation."
+    },
     {
       "version": "2026.11.5",
       "tag": "v2026.11.5",

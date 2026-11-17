@@ -6,7 +6,7 @@
 
 **Granular, Nag-Free Control for Windows 11 Defender.**
 
-> **Platform & Privileges:** Windows 11 only. ShieldSheriff prompts for Administrator (UAC) on launch to apply Defender policies (falling back to Read-Only mode if declined). Ensure **Tamper Protection** is toggled `OFF` once in `windowsdefender://threatsettings` so Defender honors local policy locks.
+> **Platform & Privileges:** Windows 11 only. Running `shiesh.exe` without arguments inspects live Defender state in Read-Only mode and exits cleanly; pass `ui --elevate`, `tray --elevate`, or `elect --elevate` (or click **Admin** inside the Command Center UI) to prompt for Administrator (UAC) privileges to apply Defender policies. Ensure **Tamper Protection** is toggled `OFF` once in `windowsdefender://threatsettings` so Defender honors local policy locks.
 
 Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a solid antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags when you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**—and Windows Updates or Defender background tasks frequently flip your settings back on.
 
@@ -65,21 +65,29 @@ shieldsheriff/
 # (or: go build -trimpath -ldflags="-s -w" -o bin\shiesh.exe ./cmd/shieldsheriff)
 ```
 
-### 2. Launch ShieldSheriff (UI & System Tray)
+### 2. Inspect Live Defender Status (Read-Only Default)
 ```powershell
 .\bin\shiesh.exe
+# (or: .\bin\shiesh.exe status [--json])
+```
+
+### 3. Launch ShieldSheriff (UI & System Tray)
+```powershell
+# Launch Command Center UI in Read-Only mode (no persistent tray; exits when closed, or click "Admin" to elevate):
+.\bin\shiesh.exe ui
+
+# Or prompt for Administrator (UAC) immediately for full UI + persistent System Tray:
+.\bin\shiesh.exe ui --elevate
+
+# Launch minimized in the persistent System Tray only (requires elevation):
+.\bin\shiesh.exe tray --elevate
 ```
 - **Windows 11 Settings-Style UI (WebView2 + Mica):** Adapts automatically to your Windows 11 Dark/Light mode, accent color, and system font. On first run (no `config.json`), ShieldSheriff shows your current PC settings without modifying anything until you stage changes and click **Apply Now** (with one-time consent for logon startup, configurable Auto-Heal interval, and startup update checks).
 - **Three-State System Tray:**
   - **Preset Mode:** Displays the active preset's shield icon (**On-Demand Only** red `-`, **Developer Workstation** sky-blue `<>`, **Quiet Guardian** blue shield, **Full Shield** green checkmark, or **Custom**).
   - **Pause Mode:** Amber shield with `||` pause bars when temporarily paused by timer or watched build process.
   - **Passive Mode:** Hollow slate shield outline when not enforcing (first run or after reverting ShieldSheriff policies).
-- **Single-Instance Locking:** Relaunching focuses the existing window instead of opening duplicates.
-
-### 3. Inspect Live Defender Status (CLI)
-```powershell
-.\bin\shiesh.exe status
-```
+- **Single-Instance Locking:** Relaunching `ui` or `tray` focuses the existing window instead of opening duplicates.
 
 ### 4. Apply a Preset or Granular Settings (CLI)
 ```powershell

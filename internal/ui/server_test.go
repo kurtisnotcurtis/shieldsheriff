@@ -90,3 +90,24 @@ func TestServerStartAndShutdown(t *testing.T) {
 		t.Fatalf("expected listener to be closed after Shutdown")
 	}
 }
+
+func TestServerWindowClosedCallback(t *testing.T) {
+	gov := sheriff.NewGovernor()
+	srv := NewServer(gov)
+
+	called := make(chan struct{}, 1)
+	srv.SetOnWindowClosed(func() {
+		select {
+		case called <- struct{}{}:
+		default:
+		}
+	})
+
+	srv.notifyWindowClosed()
+
+	select {
+	case <-called:
+	case <-time.After(time.Second):
+		t.Fatalf("expected SetOnWindowClosed callback to fire")
+	}
+}
