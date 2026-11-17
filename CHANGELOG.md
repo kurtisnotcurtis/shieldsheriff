@@ -13,11 +13,45 @@ Unlike a library with a purely abstract API contract (where SemVer `MAJOR.MINOR.
    - `0M` — Zero-padded release month (`01`–`12`), aligned with Windows cumulative update waves
    - `MICRO` — Sequential release counter within that month (`1`, `2`, ...) for feature drops or rapid Patch Tuesday hotfixes
 
-Machine-readable release and platform compatibility metadata is also maintained in [`VERSION.json`](VERSION.json) and exposed via `shieldsheriff version --json`.
+Machine-readable release and platform compatibility metadata is also maintained in [`VERSION.json`](VERSION.json) and exposed via `shiesh.exe version --json`.
 
 ---
 
-## [2026.11.2] — "Peacekeeper" (2026-11-15)
+## [Unreleased]
+
+### Added
+- **Native WebView2 Window & Windows 11 Theme Sync (`internal/ui`):** Replaced `msedge.exe --app` with a pure-Go `go-webview2` host featuring Windows 11 Mica backdrop, rounded corners, matching caption color, live Dark/Light mode + DWM accent sync, and system UI font detection (`SPI_GETNONCLIENTMETRICS`).
+- **First-Run Staging & Consent:** Launches cleanly without modifying Defender or hiding the Windows Security tray icon until the user stages changes, clicks **Apply Now**, and confirms startup, Auto-Heal, and update-check preferences.
+- **Passive Mode (`internal/defender/enforce.go`, `internal/sheriff/governor.go`):** Added `RevertPolicies()` and `EnterPassiveMode()` to stop enforcement and restore pre-ShieldSheriff settings.
+- **Logon Startup & Update Checker (`internal/sheriff/startup.go`, `internal/sheriff/update.go`):** Added elevated Task Scheduler logon registration (`ShieldSheriff Tray`) and GitHub Releases update checks on startup and from **Settings**.
+- **Dedicated Logs View & Local Build Script (`build.ps1`):** Moved **Telemetry & Audit Log** into its own **Logs** section and codified `go build -trimpath -ldflags="-s -w" -o bin\shiesh.exe ./cmd/shieldsheriff` in `build.ps1`.
+
+### Changed
+- **Binary & Config Naming:** Renamed the output binary from `shieldsheriff.exe` to `shiesh.exe` and standardized the config file to `config.json`.
+- **Three-State System Tray & Direct Copy (`internal/tray`):** Updated tray icons to reflect **Preset Mode** (matching each preset's shield icon), **Pause Mode** (amber shield with `||`), and **Passive Mode** (hollow slate shield outline), and replaced analogy-heavy menu/UI labels with direct terminology.
+- **Simplified App Logo (`site/logo.svg`, `internal/ui`, `internal/tray`):** Updated the logo to a single-color tilted hat with negative-space crease lines inset in a dark shield.
+- **Auto-Heal Interval & UAC Startup (`cmd/shieldsheriff/main.go`, `internal/sheriff/governor.go`):** Set Auto-Heal default to 15s (configurable 10s–15m), healed transient drift in `Snapshot()` when Auto-Heal is active, auto-requested UAC on interactive launch with Read-Only fallback, and closed the UI window cleanly on tray exit.
+- **Static Site & Docs (`site/`, `README.md`):** Updated `site/` with a live app screenshot (`site/preview.png`) and Fluent charcoal palette, and aligned `README.md` with the current UX.
+
+### Fixed
+- **Defender Policy Precedence (`internal/defender/inspect.go`):** Fixed `Inspect()` to prioritize Group Policy keys (`HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\...`) over local preference keys when Tamper Protection is off, preventing false drift reports on `On-Demand Only`.
+
+---
+
+## [2026.11.3] (2026-11-15)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
+
+### Added
+- **Portable GitHub Release & Winget Workflow (`.github/workflows/release.yml`, `packaging/winget/`):** Automated `amd64`/`arm64` portable `.zip` releases with `SHA256SUMS.txt` and Winget manifest rendering.
+
+### Changed
+- **Background Terminal Suppression & Clean Shutdown (`cmd/shieldsheriff/console_windows.go`, `internal/tray/systray.go`):** Suppressed owned console windows on GUI/tray launch, improved tray status indicators, and ensured server and governor shut down cleanly when exiting the tray.
+
+---
+
+## [2026.11.2] (2026-11-15)
 
 * **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
 * **Defender Platform Baseline:** `4.18.26100.5`
