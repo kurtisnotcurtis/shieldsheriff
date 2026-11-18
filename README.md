@@ -2,125 +2,143 @@
   <img src="site/logo.svg" alt="ShieldSheriff Logo" width="84" height="84" />
 </p>
 
-# ShieldSheriff
+<h1 align="center">ShieldSheriff</h1>
 
-**Granular, Nag-Free Control for Windows 11 Defender.**
+<p align="center">
+  <strong>Granular, Nag-Free Control for Windows 11 Defender.</strong><br />
+  <a href="https://kurtisnotcurtis.github.io/shieldsheriff/">Website &amp; Comparison</a> ·
+  <a href="https://github.com/kurtisnotcurtis/shieldsheriff/releases">Download Releases</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="DEVELOPMENT.md">Developer Guide</a>
+</p>
 
-> **Platform & Privileges:** Windows 11 only. Running `shiesh.exe` without arguments inspects live Defender state in Read-Only mode and exits cleanly; pass `ui --elevate`, `tray --elevate`, or `elect --elevate` (or click **Admin** inside the Command Center UI) to prompt for Administrator (UAC) privileges to apply Defender policies. Ensure **Tamper Protection** is toggled `OFF` once in `windowsdefender://threatsettings` so Defender honors local policy locks.
-
-Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a solid antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags when you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**—and Windows Updates or Defender background tasks frequently flip your settings back on.
-
-Rather than registering as a fake third-party antivirus in Windows Security Center (which causes `MsMpEng.exe` to automatically disable its own real-time protection and requires an MVI ELAM kernel certificate), **ShieldSheriff** manages Defender directly using native Windows policies:
-- **Granular Protection Engines:** Keeps `WinDefend` alive while giving you direct control over `Real-Time Protection`, `Behavior Monitoring`, `Downloads & Attachments (IOAV)`, `Script Scanning (AMSI)`, `Network Protection`, `Cloud Protection (MAPS)`, and `Sample Submission`.
-- **Silence Security Nags:** Applies Windows Security Center notification & UX policies (`DisableNotifications`, `DisableEnhancedNotifications`, `Notification_Suppress`) and optionally hides the default `SecurityHealthSystray.exe` icon (with automatic registry backup & restore).
-- **Auto-Heal Settings Drift:** Periodically inspects live Registry & WMI (`MSFT_MpPreference`) state at your configured interval (default 15s) and restores your chosen settings if Defender or Windows Update resets them.
-- **Pause Protection & Auto-Pause Watchlist:** Temporarily pause Real-Time Protection for 15m / 30m / 1h / 4h, or automatically whenever specified build tools or games (`cargo.exe`, `msbuild.exe`, `link.exe`, `rustc.exe`, etc.) are running.
-
----
-
-## Project Structure
-
-```
-shieldsheriff/
-├── cmd/shieldsheriff/
-│   ├── main.go                     # CLI, System Tray, Command Center UI & Windows Service entry point
-│   └── instance.go                 # Single-instance named mutex & Command Center focus handoff
-├── internal/
-│   ├── defender/
-│   │   ├── state.go                # StandingOrders, DeputyStatus, StandDownState, and Presets
-│   │   ├── inspect.go              # Native Win32 Registry & filesystem inspector (works unprivileged & elevated)
-│   │   ├── enforce.go              # Policy locks + live Engine keys + DCOM WMI (MSFT_MpPreference) sync
-│   │   └── elevation.go            # Token elevation check + UAC self-elevation ("runas")
-│   ├── sheriff/
-│   │   ├── config.go               # Persistent config.json storage (%ProgramData%\ShieldSheriff)
-│   │   ├── governor.go             # Drift auto-healer, Pause timer & Win32 Toolhelp32 process watcher
-│   │   ├── startup.go              # Elevated logon Task Scheduler registration (`ShieldSheriff Tray`)
-│   │   ├── update.go               # GitHub Releases update checker
-│   │   └── service.go              # Native Windows Service (SCM) dispatcher & installer
-│   ├── tray/
-│   │   ├── icon.go                 # Procedural 32-bit ARGB preset, pause, passive & brand HICON renderer
-│   │   └── systray.go              # Native Win32 Shell_NotifyIconW System Tray & popup menu
-│   ├── ui/
-│   │   ├── server.go               # Localhost (127.0.0.1) UI server & WebView2 native window host
-│   │   ├── theme.go                # Windows 11 Dark/Light mode, DWM accent & system UI font reader
-│   │   ├── window.go               # Windows 11 Mica/caption chrome, icon & HWND deduplication
-│   │   └── dashboard.html          # Windows 11 Settings-style dual-pane UI with staged Apply Now
-│   └── version/
-│       └── version.go              # CalVer (YYYY.0M.MICRO) release & Defender platform compatibility metadata
-├── build.ps1                       # Reproducible local release build script (`.\build.ps1 -Test`)
-├── site/                           # Static marketing & comparison website (index.html, styles.css, app.js)
-├── CHANGELOG.md                    # CalVer release history & Windows Defender evolution log
-├── VERSION.json                    # Machine-readable CalVer metadata & tested Defender platform matrix
-├── go.mod
-└── LICENSE
-```
+<p align="center">
+  <img src="site/preview.png" alt="ShieldSheriff Command Center UI on Windows 11" />
+</p>
 
 ---
 
-## Quick Start
+## Why ShieldSheriff?
 
-### 1. Build
+Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a capable local antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags whenever you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**—and Windows Updates regularly flip your settings back on.
+
+**ShieldSheriff** is a lightweight (~5 MB), single-binary Windows 11 Defender governor that keeps Defender under your rules using native Windows policies rather than service-killing hacks or fake third-party antivirus registration:
+
+- **Granular Engine Control:** Keep `WinDefend` alive while independently controlling **Real-Time Protection**, **Behavior Monitoring**, **Downloads & Attachments (IOAV)**, **Script Scanning (AMSI)**, **Network Protection**, **Cloud Protection (MAPS)**, and **Sample Submission**.
+- **Silence Security Center Nags:** Suppresses Windows Security toast notifications and optionally hides the Windows Security system tray icon (with automatic registry backup and restore).
+- **Auto-Heal Update Resets:** Periodically checks your live Defender state (default every 15s, configurable) and restores your chosen settings if a Windows Update or background task resets them.
+- **Timed Pause & Auto-Pause on Builds:** Temporarily pause Real-Time Protection for `15m`, `30m`, `1h`, or `4h`, or pause automatically whenever specified compilers, linkers, or games (`cargo.exe`, `msbuild.exe`, `link.exe`, `rustc.exe`, etc.) are running.
+
+---
+
+## Built-In Presets
+
+Choose a one-click preset from the **Command Center UI**, **System Tray menu**, or **CLI** (`shiesh elect --preset <id> --elevate`), or customize every toggle individually:
+
+| Preset | ID | What It Does |
+| :--- | :--- | :--- |
+| **Quiet Guardian** *(Default)* | `quiet-guardian` | **Local Real-Time ON**, Cloud Protection **OFF**, Sample Submission **OFF**, all Windows Security nags **Silenced**. |
+| **Developer Workstation** | `dev-workstation` | Keeps core Real-Time scanning ON, turns heavy **Behavior Monitoring** & **Script Scanning** hooks **OFF**, and auto-pauses scanning while `cargo.exe`, `rustc.exe`, `msbuild.exe`, or `link.exe` run. |
+| **On-Demand Only** | `on-demand-only` | Turns **Real-Time Protection OFF permanently** (no 24-hour reset) while keeping manual **Quick Scans** and **Signature Updates** working. |
+| **Full Shield (No Nags)** | `full-shield-no-nag` | Keeps **Local + Cloud Protection ON**, turns automatic file **Sample Uploads OFF**, and silences all Security Center nags. |
+
+---
+
+## Installation
+
+> **Requirements:** Windows 11 (`x64` or `arm64`). Administrator privileges (UAC) are required to apply Defender policies, run the persistent System Tray, or install the background service.
+
+### Option 1: Install via WinGet
 ```powershell
-.\build.ps1 -Test
-# (or: go build -trimpath -ldflags="-s -w" -o bin\shiesh.exe ./cmd/shieldsheriff)
+winget install kurtisnotcurtis.ShieldSheriff
 ```
+WinGet installs `shiesh.exe` and adds the `shiesh` command alias to your `PATH`.
+
+### Option 2: Portable `.zip` Archive
+1. Download `shieldsheriff-<version>-windows-amd64.zip` (or `arm64.zip`) from [GitHub Releases](https://github.com/kurtisnotcurtis/shieldsheriff/releases).
+2. Extract `shiesh.exe` into a permanent folder (for example, `C:\Tools\ShieldSheriff\`).
+   > **Note for Portable Users:** If you enable **Start in System Tray at Windows Logon** or install the **Background Service**, Windows registers the current path of `shiesh.exe`. Place `shiesh.exe` in its permanent folder before enabling startup/service options.
+
+### One-Time Prerequisite: Turn Off Tamper Protection
+Windows Defender's **Tamper Protection** blocks local apps and Group Policy keys from changing Defender settings. Before applying policies for the first time:
+1. Open **Windows Security → Virus & threat protection → Manage settings** (or run `start windowsdefender://threatsettings`).
+2. Toggle **Tamper Protection** to **Off** once.
+3. ShieldSheriff will silence the resulting Tamper Protection warning notification automatically once your Standing Orders are applied.
+
+---
+
+## Getting Started
+
+*(If you extracted the portable `.zip` without adding it to your `PATH`, replace `shiesh` below with `.\shiesh.exe`.)*
+
+### 1. Launch the Command Center UI & System Tray
+```powershell
+# Launch full Command Center UI + persistent System Tray (prompts for Administrator UAC):
+shiesh ui --elevate
+
+# Or open the Command Center UI in Read-Only mode first (no tray; click "Admin" inside the app to elevate):
+shiesh ui
+
+# Launch minimized directly to the persistent System Tray:
+shiesh tray --elevate
+```
+- **Safe First Run:** On first launch, ShieldSheriff opens in **Passive / Read-Only** state and reflects your PC's current Defender configuration without changing anything until you click **Apply Now**.
+- **Windows 11 Native Look:** Uses WebView2 with Windows 11 Mica backdrop and automatically follows your system Dark/Light theme and accent color.
+- **Three-State System Tray Icon:**
+  - **Preset Mode:** Displays the active preset shield (**Quiet Guardian** blue shield, **Developer Workstation** sky-blue `<>`, **On-Demand Only** red `-`, **Full Shield** green checkmark, or **Custom**).
+  - **Pause Mode:** Amber shield with `||` pause bars while Real-Time Protection is paused by timer or a watched process.
+  - **Passive Mode:** Hollow slate shield outline when ShieldSheriff is not actively enforcing policies.
 
 ### 2. Inspect Live Defender Status (Read-Only Default)
+Running `shiesh` with no arguments (or `shiesh status`) inspects live Defender engines, Tamper Protection, and policy drift without modifying your system or prompting for UAC:
 ```powershell
-.\bin\shiesh.exe
-# (or: .\bin\shiesh.exe status [--json])
+shiesh
+# Machine-readable JSON output:
+shiesh status --json
 ```
 
-### 3. Launch ShieldSheriff (UI & System Tray)
+### 3. Control Defender from the CLI
 ```powershell
-# Launch Command Center UI in Read-Only mode (no persistent tray; exits when closed, or click "Admin" to elevate):
-.\bin\shiesh.exe ui
+# Apply the default "Quiet Guardian" preset (prompts for Admin UAC with --elevate):
+shiesh elect --elevate
 
-# Or prompt for Administrator (UAC) immediately for full UI + persistent System Tray:
-.\bin\shiesh.exe ui --elevate
+# Apply a specific preset (quiet-guardian, dev-workstation, on-demand-only, full-shield-no-nag):
+shiesh elect --preset dev-workstation --elevate
 
-# Launch minimized in the persistent System Tray only (requires elevation):
-.\bin\shiesh.exe tray --elevate
-```
-- **Windows 11 Settings-Style UI (WebView2 + Mica):** Adapts automatically to your Windows 11 Dark/Light mode, accent color, and system font. On first run (no `config.json`), ShieldSheriff shows your current PC settings without modifying anything until you stage changes and click **Apply Now** (with one-time consent for logon startup, configurable Auto-Heal interval, and startup update checks).
-- **Three-State System Tray:**
-  - **Preset Mode:** Displays the active preset's shield icon (**On-Demand Only** red `-`, **Developer Workstation** sky-blue `<>`, **Quiet Guardian** blue shield, **Full Shield** green checkmark, or **Custom**).
-  - **Pause Mode:** Amber shield with `||` pause bars when temporarily paused by timer or watched build process.
-  - **Passive Mode:** Hollow slate shield outline when not enforcing (first run or after reverting ShieldSheriff policies).
-- **Single-Instance Locking:** Relaunching `ui` or `tray` focuses the existing window instead of opening duplicates.
+# Customize individual engine & notification settings (run from an elevated terminal):
+shiesh order realtime=on behavior=off script=off cloud=off samples=never nags=off
 
-### 4. Apply a Preset or Granular Settings (CLI)
-```powershell
-# Apply the default "Quiet Guardian" preset (Real-Time ON, Cloud OFF, Sample Submission OFF, Nags Silenced):
-.\bin\shiesh.exe elect --elevate
+# Auto-pause Real-Time Protection whenever specified processes are running:
+shiesh order watch=cargo.exe,msbuild.exe,link.exe,rustc.exe
 
-# Keep Real-Time ON, turn Behavior/Script scanning OFF, Cloud & Sample uploads OFF, and silence all nags:
-.\bin\shiesh.exe order realtime=on behavior=off script=off cloud=off samples=never nags=off
+# Temporarily pause Real-Time Protection for 30 minutes, or resume immediately:
+shiesh pause 30
+shiesh resume
 
-# Automatically pause Real-Time Protection whenever cargo.exe or msbuild.exe is running:
-.\bin\shiesh.exe order watch=cargo.exe,msbuild.exe
+# Run an on-demand Defender Quick Scan or signature update (works even in On-Demand Only mode):
+shiesh scan
+shiesh update
 
-# Manually pause Real-Time Protection for 30 minutes, then auto-resume:
-.\bin\shiesh.exe pause 30
-
-# Install as a 24/7 background SYSTEM Windows Service across reboots:
-.\bin\shiesh.exe service install
-
-# Inspect CalVer release & tested Windows Defender platform compatibility:
-.\bin\shiesh.exe version
+# Install or remove the 24/7 background Windows Service (runs as SYSTEM across reboots):
+shiesh service install
+shiesh service uninstall
 ```
 
 ---
 
-## Versioning (`CalVer`) & Changelog
+## Reverting to Windows Defaults & Uninstalling
 
-ShieldSheriff uses **Calendar Versioning (`YYYY.0M.MICRO`)** because Windows Defender (`MsMpEng.exe` / `WdFilter.sys`) and Windows Security Center (`SecurityHealthService.exe`) evolve on Microsoft's monthly Patch Tuesday and Windows 11 cumulative update schedule rather than static library SemVer contracts.
-
-- See [`CHANGELOG.md`](CHANGELOG.md) for the full release history and Windows Defender platform changes.
-- See [`VERSION.json`](VERSION.json) for machine-readable release and compatibility metadata.
+1. **Revert Defender Policies:** Open the Command Center UI (`shiesh ui --elevate`) or right-click the System Tray icon and select **Passive Mode (Stop Enforcing)** to remove ShieldSheriff's policy locks and restore standard Windows Security notifications.
+2. **Remove Background Service / Startup (if enabled):**
+   - Turn off **Start in Tray at Logon** and **Windows Service** in the **Settings** tab of the UI (or run `shiesh service uninstall` as Administrator).
+3. **Uninstall the Binary:**
+   - **WinGet:** `winget uninstall kurtisnotcurtis.ShieldSheriff`
+   - **Portable `.zip`:** Delete `shiesh.exe` and optional config folder `C:\ProgramData\ShieldSheriff`.
 
 ---
 
-## License
+## Versioning, Development & License
 
-Released under the [MIT License](LICENSE).
+- **Calendar Versioning (`CalVer`):** ShieldSheriff uses `YYYY.0M.MICRO` versioning to track Windows 11 cumulative updates and monthly Microsoft Defender platform releases. See [CHANGELOG.md](CHANGELOG.md) and [VERSION.json](VERSION.json).
+- **Building from Source & Repo Structure:** See [DEVELOPMENT.md](DEVELOPMENT.md) for the repository layout, architecture internals, and `.\build.ps1` build/test instructions.
+- **License:** Released under the [MIT License](LICENSE).
