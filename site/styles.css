@@ -751,21 +751,6 @@ section {
   border-color: var(--gold);
 }
 
-/* Code / CLI Section */
-.cli-box {
-  background: #080b12;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 24px;
-  overflow-x: auto;
-  font-size: 0.95rem;
-  line-height: 1.75;
-}
-
-.cli-comment { color: #64748b; }
-.cli-cmd { color: var(--gold); font-weight: 700; }
-.cli-arg { color: var(--cyan); }
-
 /* Footer */
 footer {
   padding: 40px 0;
