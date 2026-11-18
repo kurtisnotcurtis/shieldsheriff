@@ -245,6 +245,12 @@ code, pre {
   gap: 6px;
 }
 
+.hero-badges span::before {
+  content: "\2713";
+  color: var(--green);
+  font-weight: 700;
+}
+
 /* Interactive Simulator Card */
 .sim-window {
   background: var(--bg-surface);
