@@ -106,6 +106,13 @@ If you modify `cmd/shieldsheriff/winres/winres.json` or application icons, regen
 go generate ./cmd/shieldsheriff
 ```
 
+### Website Preview Screenshot (`scripts/capture-preview.ps1`)
+To refresh [`site/preview.png`](site/preview.png) from a live `shiesh.exe ui` window:
+
+```powershell
+.\scripts\capture-preview.ps1 -Build -StopRunning
+```
+
 ---
 
 ## Versioning (`CalVer`) & Releases
