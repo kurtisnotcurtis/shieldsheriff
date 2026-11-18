@@ -12,10 +12,10 @@ PackageUrl: https://github.com/kurtisnotcurtis/shieldsheriff
 License: MIT
 LicenseUrl: https://github.com/kurtisnotcurtis/shieldsheriff/blob/main/LICENSE
 Copyright: Copyright (c) 2024-2026 kurtisnotcurtis
-ShortDescription: Put Windows Defender under your command with nag-free, granular Standing Orders for Windows 11.
+ShortDescription: Simple, nag-free control for Windows 11 Defender.
 Description: |-
-  ShieldSheriff is a user-elected Windows Defender governor for Windows 11.
-  It keeps Microsoft Defender under your granular Standing Orders (Real-Time Protection, Behavior Monitoring, IOAV, Script Scanning, Network Protection, Cloud Protection, and Sample Submission), silences Windows Security Center nags, auto-heals configuration drift, and supports timed or process-aware Deputy Stand-Down from the CLI, System Tray, or local Command Center UI.
+  ShieldSheriff is a lightweight Windows 11 Defender configuration tool.
+  It keeps Microsoft Defender under your chosen settings (Real-Time Protection, Behavior Monitoring, IOAV, Script Scanning, Network Protection, Cloud Protection, and Sample Submission), silences Windows Security Center nags, auto-heals configuration drift, and supports timed or process-aware protection pauses from the Dashboard, System Tray, or CLI.
 Moniker: shieldsheriff
 Tags:
   - defender

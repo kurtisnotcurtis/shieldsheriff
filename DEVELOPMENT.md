@@ -11,9 +11,9 @@ For end-user installation and usage instructions, see [README.md](README.md).
 ```text
 shieldsheriff/
 ├── cmd/shieldsheriff/
-│   ├── main.go                     # CLI, System Tray, Command Center UI & Windows Service entry point
+│   ├── main.go                     # CLI, System Tray, Dashboard UI & Windows Service entry point
 │   ├── main_test.go                # CLI argument & interactive mode flag tests
-│   ├── instance.go                 # Single-instance named mutex & Command Center focus handoff
+│   ├── instance.go                 # Single-instance named mutex & Dashboard focus handoff
 │   ├── console_windows.go          # Console window suppression for GUI/Tray launches
 │   └── winres/                     # Windows application manifest & icon resource definitions
 ├── internal/

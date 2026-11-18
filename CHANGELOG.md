@@ -17,6 +17,18 @@ Machine-readable release and platform compatibility metadata is also maintained 
 
 ---
 
+## [2026.11.7] (2026-11-18)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
+
+### Changed
+- **Plain, Consistent Presets & Copy (`internal/defender/state.go`, `internal/tray/systray.go`, `internal/ui/dashboard.html`, `internal/sheriff/governor.go`):** Renamed presets to **Local Protection** (`local-protection`), **Workstation** (`workstation`), **On-Demand Only** (`on-demand`), and **Cloud + Local** (`cloud-local`), and replaced thematic phrasing (*Standing Orders*, *Deputy*, *Stand-Down*, *Command Center*) with plain terminology across UI, tray, status output, and audit logs.
+- **Discoverable CLI Verbs (`cmd/shieldsheriff/main.go`):** Replaced `elect`/`order`/`standdown` with `apply`, `set`, and `pause`.
+- **Documentation & Website (`README.md`, `CLI.md`, `site/`):** Focused `README.md` and the site Quick Start on the GUI Dashboard and System Tray with a one-click copyable `winget` install command, moved CLI reference to `CLI.md`, updated `site/preview.png`, and refined comparison card styling.
+
+---
+
 ## [2026.11.6] (2026-11-17)
 
 * **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
