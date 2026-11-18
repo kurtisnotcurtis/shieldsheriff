@@ -85,13 +85,13 @@ type StandDownState struct {
 	MatchedProcess  string    `json:"matchedProcess"`  // Non-empty if triggered by a watched process
 }
 
-// DefaultStandingOrders returns the signature "Quiet Guardian" configuration:
+// DefaultStandingOrders returns the default "Local Protection" configuration:
 // Real-Time local protection ON, Cloud lookup OFF, Automatic sample submission OFF (Never),
 // and all Windows Security nagging notifications suppressed.
 func DefaultStandingOrders() StandingOrders {
 	return StandingOrders{
 		UpdatedAt:              time.Now(),
-		PresetName:             "quiet-guardian",
+		PresetName:             "local-protection",
 		Elected:                true,
 		EnforceLoop:            true,
 		DriftCheckSeconds:      15,
@@ -121,18 +121,18 @@ type Preset struct {
 func BuiltinPresets() []Preset {
 	return []Preset{
 		{
-			ID:          "quiet-guardian",
-			Name:        "Quiet Guardian (Recommended)",
+			ID:          "local-protection",
+			Name:        "Local Protection (Recommended)",
 			Description: "Local Real-Time & Behavior protection ON; Cloud Protection & Sample Submission OFF; all Windows Security nags silenced.",
 			Orders:      DefaultStandingOrders(),
 		},
 		{
-			ID:          "dev-workstation",
-			Name:        "Developer Workstation",
-			Description: "File scan ON, heavy Behavioral & Script hooks OFF for fast builds, Cloud & Sample telemetry OFF, auto-pause on cargo/msbuild/go.",
+			ID:          "workstation",
+			Name:        "Workstation",
+			Description: "File scan ON; Behavior Monitoring & Script Scanning OFF for fast builds; Cloud & Sample telemetry OFF; auto-pauses on cargo/msbuild/rustc.",
 			Orders: StandingOrders{
 				UpdatedAt:              time.Now(),
-				PresetName:             "dev-workstation",
+				PresetName:             "workstation",
 				Elected:                true,
 				EnforceLoop:            true,
 				RealtimeProtection:     true,
@@ -149,12 +149,12 @@ func BuiltinPresets() []Preset {
 			},
 		},
 		{
-			ID:          "on-demand-only",
-			Name:        "On-Demand Only (Zero Background Overhead)",
+			ID:          "on-demand",
+			Name:        "On-Demand Only",
 			Description: "Real-Time Protection permanently OFF (no 24h auto-reset). Manual scans & signature updates remain active. All nags silenced.",
 			Orders: StandingOrders{
 				UpdatedAt:              time.Now(),
-				PresetName:             "on-demand-only",
+				PresetName:             "on-demand",
 				Elected:                true,
 				EnforceLoop:            true,
 				RealtimeProtection:     false,
@@ -171,12 +171,12 @@ func BuiltinPresets() []Preset {
 			},
 		},
 		{
-			ID:          "full-shield-no-nag",
-			Name:        "Full Local + Cloud Shield (Nag-Free)",
-			Description: "All local engines + Cloud lookup ON, automatic file sample uploads OFF, security nags silenced.",
+			ID:          "cloud-local",
+			Name:        "Cloud + Local",
+			Description: "All local engines + Cloud Protection (MAPS) ON; automatic file sample uploads OFF; all Windows Security nags silenced.",
 			Orders: StandingOrders{
 				UpdatedAt:              time.Now(),
-				PresetName:             "full-shield-no-nag",
+				PresetName:             "cloud-local",
 				Elected:                true,
 				EnforceLoop:            true,
 				RealtimeProtection:     true,

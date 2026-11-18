@@ -118,7 +118,7 @@ func NewGovernor() *Governor {
 	if firstRun {
 		g.addAuditLocked("INIT", "First run detected; awaiting user selection before modifying Defender")
 	} else {
-		g.addAuditLocked("INIT", fmt.Sprintf("Loaded Standing Orders (%s) from %s", orders.PresetName, path))
+		g.addAuditLocked("INIT", fmt.Sprintf("Loaded configuration (%s) from %s", orders.PresetName, path))
 	}
 	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
 	if firstRun {
@@ -227,9 +227,9 @@ func (g *Governor) UpdateOrders(orders defender.StandingOrders) (defender.Enforc
 	}
 	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
 	if res.Success {
-		g.addAuditLocked("ENFORCE", fmt.Sprintf("Applied Standing Orders (%s): %d policies enforced", orders.PresetName, len(res.Applied)))
+		g.addAuditLocked("APPLY", fmt.Sprintf("Applied configuration (%s): %d policies enforced", orders.PresetName, len(res.Applied)))
 	} else if len(res.Warnings) > 0 {
-		g.addAuditLocked("WARN", fmt.Sprintf("Saved Standing Orders (%s); enforcement pending elevation: %s", orders.PresetName, res.Warnings[0]))
+		g.addAuditLocked("WARN", fmt.Sprintf("Saved configuration (%s); enforcement pending elevation: %s", orders.PresetName, res.Warnings[0]))
 	}
 	cb := g.onStateSync
 	st := g.lastStatus
@@ -248,7 +248,7 @@ func (g *Governor) EnforceNow() defender.EnforceResult {
 	res := defender.Enforce(g.orders, &g.standDown)
 	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
 	if res.Success {
-		g.addAuditLocked("ENFORCE", fmt.Sprintf("Enforced Standing Orders (%d rules applied)", len(res.Applied)))
+		g.addAuditLocked("ENFORCE", fmt.Sprintf("Enforced configuration (%d rules applied)", len(res.Applied)))
 	} else if len(res.Warnings) > 0 {
 		g.addAuditLocked("WARN", strings.Join(res.Warnings, "; "))
 	}
@@ -298,7 +298,7 @@ func (g *Governor) StartStandDown(duration time.Duration, reason string) defende
 	}
 	res := defender.Enforce(g.orders, &g.standDown)
 	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
-	g.addAuditLocked("STANDDOWN", fmt.Sprintf("Deputy ordered to stand down for %s (%s)", duration.Round(time.Second), reason))
+	g.addAuditLocked("PAUSE", fmt.Sprintf("Protection paused for %s (%s)", duration.Round(time.Second), reason))
 	cb := g.onStateSync
 	st := g.lastStatus
 	ord := g.orders
@@ -317,7 +317,7 @@ func (g *Governor) ResumeFromStandDown() defender.EnforceResult {
 	g.standDown = defender.StandDownState{}
 	res := defender.Enforce(g.orders, &g.standDown)
 	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
-	g.addAuditLocked("STANDDOWN", "Deputy resumed normal duty under Standing Orders")
+	g.addAuditLocked("PAUSE", "Protection resumed")
 	cb := g.onStateSync
 	st := g.lastStatus
 	ord := g.orders
@@ -382,11 +382,11 @@ func (g *Governor) tick() {
 	now := time.Now()
 	stateChanged := false
 
-	// 1. Check timed Stand-Down expiration
+	// 1. Check timed Pause expiration
 	if g.standDown.Active && !g.standDown.ExpiresAt.IsZero() && now.After(g.standDown.ExpiresAt) {
 		g.standDown = defender.StandDownState{}
 		_ = defender.Enforce(g.orders, &g.standDown)
-		g.addAuditLocked("STANDDOWN", "Stand-Down timer expired; restored Standing Orders")
+		g.addAuditLocked("PAUSE", "Pause timer expired; restored configuration")
 		stateChanged = true
 	}
 
@@ -401,13 +401,13 @@ func (g *Governor) tick() {
 				MatchedProcess: matched,
 			}
 			_ = defender.Enforce(g.orders, &g.standDown)
-			g.addAuditLocked("STANDDOWN", fmt.Sprintf("Auto Stand-Down triggered by %s", matched))
+			g.addAuditLocked("PAUSE", fmt.Sprintf("Auto-pause triggered by %s", matched))
 			stateChanged = true
 		} else if matched == "" && g.standDown.Active && g.standDown.MatchedProcess != "" && g.standDown.ExpiresAt.IsZero() {
 			prevProc := g.standDown.MatchedProcess
 			g.standDown = defender.StandDownState{}
 			_ = defender.Enforce(g.orders, &g.standDown)
-			g.addAuditLocked("STANDDOWN", fmt.Sprintf("Watched process %s exited; restored Real-Time Protection", prevProc))
+			g.addAuditLocked("PAUSE", fmt.Sprintf("Watched process %s exited; restored Real-Time Protection", prevProc))
 			stateChanged = true
 		}
 	}

@@ -1,6 +1,6 @@
 const PRESETS = {
-  "quiet-guardian": {
-    name: "Quiet Guardian (Default)",
+  "local-protection": {
+    name: "Local Protection (Default)",
     badgeText: "PROTECTED",
     badgeClass: "chip-gold",
     rtp: { text: "ON (Locked)", cls: "chip-on" },
@@ -9,10 +9,10 @@ const PRESETS = {
     samples: { text: "NEVER (SubmitSamplesConsent=2)", cls: "chip-off" },
     nags: { text: "SILENCED (DisableNotifications=1)", cls: "chip-gold" },
     watch: { text: "Manual / Timer Only", cls: "chip-off" },
-    trayText: "ShieldSheriff: Quiet Guardian"
+    trayText: "ShieldSheriff: Local Protection"
   },
-  "dev-workstation": {
-    name: "Developer Workstation",
+  "workstation": {
+    name: "Workstation",
     badgeText: "PROTECTED",
     badgeClass: "chip-cyan",
     rtp: { text: "ON (Auto-Pauses on Builds)", cls: "chip-cyan" },
@@ -21,9 +21,9 @@ const PRESETS = {
     samples: { text: "NEVER (Uncompiled Binaries Stay Local)", cls: "chip-off" },
     nags: { text: "SILENCED + Tray Icon Muted", cls: "chip-gold" },
     watch: { text: "cargo.exe, msbuild.exe, link.exe, rustc.exe", cls: "chip-cyan" },
-    trayText: "ShieldSheriff: Developer Workstation"
+    trayText: "ShieldSheriff: Workstation"
   },
-  "on-demand-only": {
+  "on-demand": {
     name: "On-Demand Only",
     badgeText: "REAL-TIME OFF",
     badgeClass: "chip-gold",
@@ -35,8 +35,8 @@ const PRESETS = {
     watch: { text: "MpCmdRun.exe CLI Scans Still Active", cls: "chip-on" },
     trayText: "ShieldSheriff: On-Demand Only"
   },
-  "full-shield": {
-    name: "Full Shield (Nag-Free)",
+  "cloud-local": {
+    name: "Cloud + Local",
     badgeText: "PROTECTED",
     badgeClass: "chip-on",
     rtp: { text: "ON (Locked)", cls: "chip-on" },
@@ -45,7 +45,7 @@ const PRESETS = {
     samples: { text: "NEVER (No Automatic File Uploads)", cls: "chip-off" },
     nags: { text: "SILENCED (No Sample/Tamper Nags)", cls: "chip-gold" },
     watch: { text: "15s Auto-Heal Active", cls: "chip-on" },
-    trayText: "ShieldSheriff: Full Shield"
+    trayText: "ShieldSheriff: Cloud + Local"
   }
 };
 
@@ -121,7 +121,16 @@ function selectScenario(id, btnEl) {
   });
 }
 
+function copyCommand(btn, text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = "Copy"; }, 1800);
+    });
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
-  selectPreset("quiet-guardian", document.querySelector('.sim-tab[data-preset="quiet-guardian"]'));
+  selectPreset("local-protection", document.querySelector('.sim-tab[data-preset="local-protection"]'));
   selectScenario("all", document.querySelector('.scenario-btn[data-scenario="all"]'));
 });

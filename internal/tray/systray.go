@@ -267,13 +267,13 @@ func (t *AppTray) refreshIconAndTip(initial bool) {
 		icon = t.iconPassive
 	} else {
 		switch ord.PresetName {
-		case "on-demand-only":
+		case "on-demand":
 			icon = t.iconOnDemand
-		case "dev-workstation":
+		case "workstation":
 			icon = t.iconDev
-		case "quiet-guardian":
+		case "local-protection":
 			icon = t.iconQuiet
-		case "full-shield-no-nag":
+		case "cloud-local":
 			icon = t.iconFull
 		default:
 			icon = t.iconCustom
@@ -294,14 +294,14 @@ func (t *AppTray) refreshIconAndTip(initial bool) {
 
 func presetDisplayName(id string) string {
 	switch id {
-	case "quiet-guardian":
-		return "Quiet Guardian"
-	case "dev-workstation":
-		return "Developer Workstation"
-	case "on-demand-only":
+	case "local-protection":
+		return "Local Protection"
+	case "workstation":
+		return "Workstation"
+	case "on-demand":
 		return "On-Demand Only"
-	case "full-shield-no-nag":
-		return "Full Shield"
+	case "cloud-local":
+		return "Cloud + Local"
 	default:
 		return "Custom"
 	}
@@ -428,10 +428,10 @@ func (t *AppTray) showContextMenu() {
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
 	// Presets (top-level)
-	appendMenuItem(hMenu, checkFlag(ord.PresetName == "quiet-guardian"), cmdPresetQuietGuardian, "Quiet Guardian")
-	appendMenuItem(hMenu, checkFlag(ord.PresetName == "dev-workstation"), cmdPresetDevWork, "Developer Workstation")
-	appendMenuItem(hMenu, checkFlag(ord.PresetName == "on-demand-only"), cmdPresetOnDemand, "On-Demand Only")
-	appendMenuItem(hMenu, checkFlag(ord.PresetName == "full-shield-no-nag"), cmdPresetFullShield, "Full Shield")
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "local-protection"), cmdPresetQuietGuardian, "Local Protection")
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "workstation"), cmdPresetDevWork, "Workstation")
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "on-demand"), cmdPresetOnDemand, "On-Demand Only")
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "cloud-local"), cmdPresetFullShield, "Cloud + Local")
 
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
@@ -491,10 +491,10 @@ func (t *AppTray) handleCommand(cmd uint32) {
 
 	case cmdPresetQuietGuardian, cmdPresetDevWork, cmdPresetOnDemand, cmdPresetFullShield:
 		targetID := map[uint32]string{
-			cmdPresetQuietGuardian: "quiet-guardian",
-			cmdPresetDevWork:       "dev-workstation",
-			cmdPresetOnDemand:      "on-demand-only",
-			cmdPresetFullShield:    "full-shield-no-nag",
+			cmdPresetQuietGuardian: "local-protection",
+			cmdPresetDevWork:       "workstation",
+			cmdPresetOnDemand:      "on-demand",
+			cmdPresetFullShield:    "cloud-local",
 		}[cmd]
 		for _, p := range defender.BuiltinPresets() {
 			if p.ID == targetID {

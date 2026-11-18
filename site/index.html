@@ -15,7 +15,7 @@
     "name": "ShieldSheriff",
     "operatingSystem": "Windows 10, Windows 11",
     "applicationCategory": "SecurityApplication",
-    "description": "User-elected governor for Windows Defender that locks granular engine settings, disables Cloud and Sample Submission telemetry permanently, pauses scanning during compiler builds, and silences Windows Security nags.",
+    "description": "Windows Defender configuration tool that locks granular engine settings, disables Cloud and Sample Submission telemetry permanently, pauses scanning during compiler builds, and silences Windows Security nags.",
     "offers": {
       "@type": "Offer",
       "price": "0",
@@ -164,7 +164,7 @@
             </tr>
             <tr id="row-drift">
               <td><strong>Auto-Heals Windows Update Resets</strong></td>
-              <td class="col-sheriff"><span class="badge-yes">&#10003; 5s Drift Guard</span></td>
+              <td class="col-sheriff"><span class="badge-yes">&#10003; Drift Guard</span></td>
               <td><span class="badge-no">&#10007; One-Shot</span></td>
               <td><span class="badge-no">&#10007; One-Shot</span></td>
               <td><span class="badge-yes">&#10003; Resident</span></td>
@@ -217,9 +217,9 @@
               </svg>
             </div>
             <ul class="comp-bullets">
-              <li><span class="badge-no">&#10007;</span> No granular toggles (only 100% ON or DEAD)</li>
-              <li><span class="badge-no">&#10007;</span> Breaks manual scans &amp; signature updates</li>
-              <li><span class="badge-no">&#10007;</span> Flagged by AVs as <code>HackTool:Win32/Defnot</code></li>
+              <li><span class="badge-no">&#10007;</span> <span>No granular toggles (only 100% ON or DEAD)</span></li>
+              <li><span class="badge-no">&#10007;</span> <span>Breaks manual scans &amp; signature updates</span></li>
+              <li><span class="badge-no">&#10007;</span> <span>Flagged by AVs as <code>HackTool:Win32/Defnot</code></span></li>
             </ul>
           </div>
           <div class="diff-box">
@@ -247,9 +247,9 @@
               </svg>
             </div>
             <ul class="comp-bullets">
-              <li><span class="badge-warn">&#9888;</span> Built to turn <em>more</em> Cloud &amp; ASR rules ON</li>
-              <li><span class="badge-no">&#10007;</span> Doesn't silence Security Center toast nags</li>
-              <li><span class="badge-no">&#10007;</span> One-shot registry edit; no build watcher</li>
+              <li><span class="badge-warn">&#9888;</span> <span>Built to turn <em>more</em> Cloud &amp; ASR rules ON</span></li>
+              <li><span class="badge-no">&#10007;</span> <span>Doesn't silence Security Center toast nags</span></li>
+              <li><span class="badge-no">&#10007;</span> <span>One-shot registry edit; no build watcher</span></li>
             </ul>
           </div>
           <div class="diff-box">
@@ -309,7 +309,7 @@
             <div class="v-step">
               <div class="v-icon">&#128275;</div>
               <div class="v-text">
-                <strong>1-Time Tamper Handoff</strong>
+                <strong>One-Time Tamper Setup</strong>
                 <span>Toggle Tamper Protection off once in Windows Security so Windows honors local policy locks.</span>
               </div>
             </div>
@@ -330,7 +330,7 @@
             <div class="v-step">
               <div class="v-icon">&#9889;</div>
               <div class="v-text">
-                <strong>5s Drift Guard &amp; Build Watcher</strong>
+                <strong>Drift Guard &amp; Build Watcher</strong>
                 <span>Reverts update resets automatically and pauses scanning while compilers run.</span>
               </div>
             </div>
@@ -375,33 +375,58 @@
     </div>
   </section>
 
-  <!-- Get Started / CLI Section -->
+  <!-- Get Started Section -->
   <section id="cli">
     <div class="container">
       <div class="section-header">
         <div class="eyebrow">Quick Start</div>
         <h2>Get Started in 30 Seconds</h2>
         <p>
-          Use the dark-mode <strong>Command Center UI</strong>, the <strong>System Tray Star</strong>, or the PowerShell CLI.
+          Install ShieldSheriff and configure Windows Defender from the <strong>Dashboard</strong> and <strong>System Tray</strong>.
         </p>
       </div>
 
+      <div class="arch-panel good" style="max-width: 780px; margin: 0 auto 24px;">
+        <div class="visual-steps">
+          <div class="v-step">
+            <div class="v-icon">1</div>
+            <div class="v-text">
+              <strong>Install ShieldSheriff</strong>
+              <div class="cmd-copy">
+                <code>winget install kurtisnotcurtis.ShieldSheriff</code>
+                <button type="button" class="cmd-copy-btn" onclick="copyCommand(this, 'winget install kurtisnotcurtis.ShieldSheriff')">Copy</button>
+              </div>
+              <span>Or extract the portable <code>.zip</code> from <a href="https://github.com/kurtisnotcurtis/shieldsheriff/releases" style="color: var(--gold);">GitHub Releases</a>.</span>
+            </div>
+          </div>
+          <div class="v-step">
+            <div class="v-icon">2</div>
+            <div class="v-text">
+              <strong>Open the Dashboard</strong>
+              <span>Launch <strong>ShieldSheriff</strong> from the Start Menu (or run <code>shiesh ui --elevate</code>). It starts in Read-Only mode without changing anything until you apply.</span>
+            </div>
+          </div>
+          <div class="v-step">
+            <div class="v-icon">3</div>
+            <div class="v-text">
+              <strong>Turn Off Tamper Protection Once</strong>
+              <span>If the status banner shows Tamper Protection is on, click <strong>Open Windows Security</strong> and toggle it off once so Windows honors local policy locks.</span>
+            </div>
+          </div>
+          <div class="v-step">
+            <div class="v-icon">4</div>
+            <div class="v-text">
+              <strong>Pick a Preset &amp; Click Apply Now</strong>
+              <span>Select <strong>Local Protection</strong>, <strong>Workstation</strong>, <strong>On-Demand Only</strong>, or <strong>Cloud + Local</strong>, then click <strong>Apply Now</strong> to save and enable the System Tray.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="cli-box">
-<pre><span class="cli-comment"># 1. Inspect live Defender status, Tamper Protection, and drift</span>
-<span class="cli-cmd">.\shiesh.exe</span> <span class="cli-arg">status</span>
-
-<span class="cli-comment"># 2. Apply the default "Quiet Guardian" preset (prompts for Admin UAC)</span>
-<span class="cli-comment">#    Real-Time ON &bull; Cloud OFF &bull; Sample Uploads OFF &bull; All Nags Silenced</span>
-<span class="cli-cmd">.\shiesh.exe</span> <span class="cli-arg">elect --elevate</span>
-
-<span class="cli-comment"># 3. Customize individual toggles from the CLI</span>
-<span class="cli-cmd">.\shiesh.exe</span> <span class="cli-arg">order realtime=on behavior=off script=off cloud=off samples=never nags=off</span>
-
-<span class="cli-comment"># 4. Auto-pause Real-Time Protection while compilers run</span>
-<span class="cli-cmd">.\shiesh.exe</span> <span class="cli-arg">order watch=cargo.exe,rustc.exe,msbuild.exe,link.exe</span>
-
-<span class="cli-comment"># 5. Install the 24/7 background SYSTEM service</span>
-<span class="cli-cmd">.\shiesh.exe</span> <span class="cli-arg">service install</span></pre>
+<pre><span class="cli-comment"># Optional: install via WinGet or script from PowerShell</span>
+<span class="cli-cmd">winget</span> <span class="cli-arg">install kurtisnotcurtis.ShieldSheriff</span>
+<span class="cli-cmd">shiesh</span> <span class="cli-arg">ui --elevate</span>    <span class="cli-comment"># Launch Dashboard + System Tray (Admin)</span></pre>
       </div>
     </div>
   </section>

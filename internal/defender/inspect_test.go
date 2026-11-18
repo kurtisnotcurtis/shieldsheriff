@@ -7,8 +7,8 @@ import (
 
 func TestEvaluateComplianceAndPresets(t *testing.T) {
 	orders := DefaultStandingOrders()
-	if orders.PresetName != "quiet-guardian" {
-		t.Fatalf("expected default preset quiet-guardian, got %s", orders.PresetName)
+	if orders.PresetName != "local-protection" {
+		t.Fatalf("expected default preset local-protection, got %s", orders.PresetName)
 	}
 
 	// Simulate matching live state

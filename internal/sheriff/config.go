@@ -12,7 +12,7 @@ import (
 // AuditEntry records an action taken by ShieldSheriff.
 type AuditEntry struct {
 	Timestamp time.Time `json:"timestamp"`
-	Category  string    `json:"category"` // "ELECT", "ENFORCE", "DRIFT", "STANDDOWN", "SCAN"
+	Category  string    `json:"category"` // "APPLY", "ENFORCE", "DRIFT", "PAUSE", "SCAN"
 	Message   string    `json:"message"`
 }
 

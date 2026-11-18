@@ -52,8 +52,8 @@ func TestServerEndpoints(t *testing.T) {
 	rec4 := httptest.NewRecorder()
 	h.ServeHTTP(rec4, req4)
 
-	// 5. Embedded Sheriff preset artwork
-	for _, id := range []string{"quiet-guardian", "dev-workstation", "on-demand-only", "full-shield-no-nag"} {
+	// 5. Embedded preset artwork
+	for _, id := range []string{"local-protection", "workstation", "on-demand", "cloud-local"} {
 		reqImg := httptest.NewRequest(http.MethodGet, "/assets/presets/"+id+".jpg", nil)
 		recImg := httptest.NewRecorder()
 		h.ServeHTTP(recImg, reqImg)

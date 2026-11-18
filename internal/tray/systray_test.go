@@ -8,13 +8,13 @@ import (
 )
 
 func TestTrayRunningIndicators(t *testing.T) {
-	ord := defender.StandingOrders{PresetName: "quiet-guardian", Elected: true}
+	ord := defender.StandingOrders{PresetName: "local-protection", Elected: true}
 
 	tipOK := formatTrayTip("http://127.0.0.1:38419", defender.DeputyStatus{
 		InCompliance:       true,
 		RealtimeProtection: true,
 	}, ord, defender.StandDownState{})
-	if tipOK != "ShieldSheriff: Quiet Guardian" {
+	if tipOK != "ShieldSheriff: Local Protection" {
 		t.Fatalf("unexpected preset tip: %q", tipOK)
 	}
 
@@ -29,7 +29,7 @@ func TestTrayRunningIndicators(t *testing.T) {
 		InCompliance: false,
 		DriftItems:   []string{"Real-Time Protection"},
 	}, ord, defender.StandDownState{})
-	if !strings.Contains(tipDrift, "Quiet Guardian") || !strings.Contains(tipDrift, "1 Drift Item(s)") {
+	if !strings.Contains(tipDrift, "Local Protection") || !strings.Contains(tipDrift, "1 Drift Item(s)") {
 		t.Fatalf("unexpected drift tip: %q", tipDrift)
 	}
 

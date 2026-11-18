@@ -38,12 +38,12 @@ func main() {
 		runInteractive(true, opts.replace, opts.elevate)
 	case "status":
 		runStatus(args[1:])
-	case "elect", "enforce":
-		runElect(args[1:])
-	case "order", "set":
-		runOrder(args[1:])
-	case "standdown", "pause":
-		runStandDown(args[1:])
+	case "apply":
+		runApply(args[1:])
+	case "set":
+		runSet(args[1:])
+	case "pause":
+		runPause(args[1:])
 	case "resume":
 		runResume()
 	case "scan":
@@ -117,7 +117,7 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bo
 		if openWindowOnStart {
 			_ = focusExistingInstance(preferredPort)
 		}
-		fmt.Println("★ ShieldSheriff Command Center is already running.")
+		fmt.Println("ShieldSheriff is already running.")
 		return
 	}
 	if release != nil {
@@ -153,11 +153,11 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bo
 
 	srv, err := ui.StartServer(gov, preferredPort)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to start Command Center UI server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to start Dashboard UI server: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("★ ShieldSheriff Command Center running at %s\n", srv.URL())
+	fmt.Printf("ShieldSheriff Dashboard running at %s\n", srv.URL())
 	if openWindowOnStart {
 		go func() {
 			time.Sleep(250 * time.Millisecond)
@@ -204,7 +204,7 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bo
 func runReadOnlyUI(gov *sheriff.Governor, preferredPort int) {
 	srv, err := ui.StartServer(gov, preferredPort)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to start Command Center UI server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to start Dashboard UI server: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -230,7 +230,7 @@ func runReadOnlyUI(gov *sheriff.Governor, preferredPort int) {
 		}
 	}()
 
-	fmt.Printf("★ ShieldSheriff Command Center (Read-Only) running at %s\n", srv.URL())
+	fmt.Printf("ShieldSheriff Dashboard (Read-Only) running at %s\n", srv.URL())
 	srv.OpenWindow()
 
 	<-doneCh
@@ -258,21 +258,21 @@ func runStatus(args []string) {
 	}
 
 	fmt.Println("================================================================")
-	fmt.Printf(" ★  SHIELDSHERIFF v%s (%s) — DEFENDER STATUS & STANDING ORDERS\n", version.Version, version.Codename)
+	fmt.Printf("  SHIELDSHERIFF v%s (%s) — DEFENDER STATUS & CONFIGURATION\n", version.Version, version.Codename)
 	fmt.Println("================================================================")
 	fmt.Printf("  Privilege Level     : %s\n", map[bool]string{true: "Elevated (Administrator / SYSTEM)", false: "Standard User (Read-Only)"}[st.IsElevated])
-	fmt.Printf("  Standing Orders     : %s (%s)\n", ord.PresetName, cfgPath)
+	fmt.Printf("  Configuration       : %s (%s)\n", ord.PresetName, cfgPath)
 	fmt.Printf("  Defender Service    : %s (Platform %s | Signatures %s)\n",
 		map[bool]string{true: "RUNNING", false: "STOPPED"}[st.ServiceRunning],
 		st.PlatformVersion, st.SignatureVersion)
 	fmt.Printf("  Tamper Protection   : %s (raw=0x%x)\n",
-		map[bool]string{true: "ON  [Blocks policy writes — toggle OFF once in Windows Security]", false: "OFF [Ready for ShieldSheriff governance]"}[st.TamperProtectionActive],
+		map[bool]string{true: "ON  [Blocks policy writes — toggle OFF once in Windows Security]", false: "OFF [Ready for ShieldSheriff]"}[st.TamperProtectionActive],
 		st.TamperProtectionRaw)
 	if sd.Active {
-		fmt.Printf("  Stand-Down Status   : ACTIVE (%s)\n", sd.Reason)
+		fmt.Printf("  Pause Status        : ACTIVE (%s)\n", sd.Reason)
 	}
 	fmt.Println("----------------------------------------------------------------")
-	fmt.Println("  SETTING                         LIVE STATE          STANDING ORDER")
+	fmt.Println("  SETTING                         LIVE STATE          CONFIGURED")
 	fmt.Println("----------------------------------------------------------------")
 	printRow := func(name, live, order string) {
 		fmt.Printf("  %-30s  %-18s  %s\n", name, live, order)
@@ -294,20 +294,20 @@ func runStatus(args []string) {
 	printRow("Windows Security Tray Icon", map[bool]string{true: "MUTED", false: "VISIBLE"}[st.SecurityTrayIconMuted], map[bool]string{true: "MUTED", false: "VISIBLE"}[ord.MuteWindowsSecSystray])
 	fmt.Println("----------------------------------------------------------------")
 	if st.InCompliance {
-		fmt.Println("  COMPLIANCE: ★ IN FULL COMPLIANCE (Keeping the Peace)")
+		fmt.Println("  COMPLIANCE: IN COMPLIANCE")
 	} else {
 		fmt.Printf("  COMPLIANCE: ! %d DRIFT ITEM(S) DETECTED:\n", len(st.DriftItems))
 		for _, d := range st.DriftItems {
 			fmt.Printf("    - %s\n", d)
 		}
 		if !st.IsElevated {
-			fmt.Println("\n  Tip: Run `shieldsheriff elect --elevate` to apply Standing Orders as Administrator.")
+			fmt.Println("\n  Tip: Run `shieldsheriff apply --elevate` to apply configuration as Administrator.")
 		}
 	}
 	fmt.Println("================================================================")
 }
 
-func runElect(args []string) {
+func runApply(args []string) {
 	gov := sheriff.NewGovernor()
 	_, ord, _, _, _ := gov.Snapshot()
 
@@ -328,7 +328,7 @@ func runElect(args []string) {
 				}
 			}
 			if !found {
-				fmt.Fprintf(os.Stderr, "Unknown preset %q. Available: quiet-guardian, dev-workstation, on-demand-only, full-shield-no-nag\n", presetID)
+				fmt.Fprintf(os.Stderr, "Unknown preset %q. Available: local-protection, workstation, on-demand, cloud-local\n", presetID)
 				os.Exit(1)
 			}
 		}
@@ -336,8 +336,8 @@ func runElect(args []string) {
 
 	if !defender.IsProcessElevated() && wantElevate {
 		_, _ = sheriff.SaveOrders(ord)
-		fmt.Println("Requesting Administrator privileges via UAC to enforce Standing Orders...")
-		if err := defender.RelaunchElevated([]string{"elect"}); err != nil {
+		fmt.Println("Requesting Administrator privileges via UAC to apply configuration...")
+		if err := defender.RelaunchElevated([]string{"apply"}); err != nil {
 			fmt.Fprintf(os.Stderr, "Elevation failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -346,7 +346,7 @@ func runElect(args []string) {
 
 	res, err := gov.UpdateOrders(ord)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Note saving orders: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Note saving settings: %v\n", err)
 	}
 	for _, a := range res.Applied {
 		fmt.Printf("  [✓] %s\n", a)
@@ -357,12 +357,12 @@ func runElect(args []string) {
 	runStatus(nil)
 }
 
-func runOrder(args []string) {
+func runSet(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: shieldsheriff order <key>=<value> [key=value ...]")
+		fmt.Fprintln(os.Stderr, "Usage: shieldsheriff set <key>=<value> [key=value ...]")
 		fmt.Fprintln(os.Stderr, "Examples:")
-		fmt.Fprintln(os.Stderr, "  shieldsheriff order realtime=on cloud=off samples=off nags=off")
-		fmt.Fprintln(os.Stderr, "  shieldsheriff order behavior=off script=off systray=mute")
+		fmt.Fprintln(os.Stderr, "  shieldsheriff set realtime=on cloud=off samples=off nags=off")
+		fmt.Fprintln(os.Stderr, "  shieldsheriff set behavior=off script=off systray=mute")
 		os.Exit(1)
 	}
 
@@ -459,7 +459,7 @@ func runOrder(args []string) {
 	runStatus(nil)
 }
 
-func runStandDown(args []string) {
+func runPause(args []string) {
 	mins := 30
 	if len(args) > 0 {
 		if m, err := strconv.Atoi(args[0]); err == nil && m > 0 {
@@ -467,8 +467,8 @@ func runStandDown(args []string) {
 		}
 	}
 	gov := sheriff.NewGovernor()
-	res := gov.StartStandDown(time.Duration(mins)*time.Minute, fmt.Sprintf("CLI %dm Stand-Down", mins))
-	fmt.Printf("★ Deputy ordered to stand down for %d minutes.\n", mins)
+	res := gov.StartStandDown(time.Duration(mins)*time.Minute, fmt.Sprintf("CLI %dm Pause", mins))
+	fmt.Printf("Protection paused for %d minutes.\n", mins)
 	for _, w := range res.Warnings {
 		fmt.Printf("  [!] %s\n", w)
 	}
@@ -477,7 +477,7 @@ func runStandDown(args []string) {
 func runResume() {
 	gov := sheriff.NewGovernor()
 	res := gov.ResumeFromStandDown()
-	fmt.Println("★ Deputy resumed normal duty under Standing Orders.")
+	fmt.Println("Protection resumed.")
 	for _, w := range res.Warnings {
 		fmt.Printf("  [!] %s\n", w)
 	}
@@ -493,7 +493,7 @@ func runScan() {
 		fmt.Fprintf(os.Stderr, "Quick scan error: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("★ Quick Scan finished cleanly.")
+	fmt.Println("Quick Scan finished cleanly.")
 }
 
 func runUpdate() {
@@ -506,7 +506,7 @@ func runUpdate() {
 		fmt.Fprintf(os.Stderr, "Signature update error: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("★ Definitions updated.")
+	fmt.Println("Definitions updated.")
 }
 
 func runService(args []string) {
@@ -551,28 +551,28 @@ func runVersion(args []string) {
 }
 
 func printUsage() {
-	fmt.Printf("ShieldSheriff v%s (%s) — Put Windows Defender Under Your Command\n\n", version.Version, version.Codename)
+	fmt.Printf("ShieldSheriff v%s (%s) — Simple, Nag-Free Control for Windows Defender\n\n", version.Version, version.Codename)
 	fmt.Println(`Usage:
   shieldsheriff                         Inspect live Defender status (read-only) and exit
-  shieldsheriff ui [--elevate]          Launch Command Center UI (Read-Only window without tray unless --elevate)
+  shieldsheriff ui [--elevate]          Launch Dashboard UI (Read-Only window without tray unless --elevate)
   shieldsheriff tray [--elevate]        Launch persistent System Tray (requires elevation / --elevate)
   shieldsheriff status [--json]         Inspect live Defender status, Tamper Protection & Drift
-  shieldsheriff elect [--preset <id>]   Apply Standing Orders (use --elevate for UAC prompt)
-  shieldsheriff order <k>=<v> ...       Configure granular Standing Orders
-  shieldsheriff standdown [minutes]     Temporarily pause Real-Time Protection
-  shieldsheriff resume                  Resume Real-Time Protection from Stand-Down
+  shieldsheriff apply [--preset <id>]   Apply configuration (use --elevate for UAC prompt)
+  shieldsheriff set <k>=<v> ...         Configure individual settings
+  shieldsheriff pause [minutes]         Temporarily pause Real-Time Protection
+  shieldsheriff resume                  Resume Real-Time Protection from pause
   shieldsheriff scan                    Run on-demand Quick Scan via MpCmdRun.exe
-  shieldsheriff update                  Update Defender signatures via MpCmdRun.exe
+  shieldsheriff update                  Update Defender definitions via MpCmdRun.exe
   shieldsheriff service <install|uninstall>  Manage 24/7 SYSTEM background enforcement service
   shieldsheriff version [--json]        Print CalVer release & Windows Defender platform metadata`)
 	fmt.Println(`
 Presets (--preset):
-  quiet-guardian      Real-Time ON, Cloud OFF, Sample Submission OFF, All Nags Silenced
-  dev-workstation     Fast Builds (Behavior/Script hooks OFF, Auto Stand-Down on cargo/msbuild)
-  on-demand-only      Real-Time OFF permanently (no 24h reset), Manual Scans ON, Nags Silenced
-  full-shield-no-nag  Local + Cloud Protection ON, Sample Upload OFF, All Nags Silenced
+  local-protection    Real-Time ON, Cloud OFF, Sample Submission OFF, All Nags Silenced
+  workstation         Fast Builds (Behavior/Script hooks OFF, Auto-Pause on cargo/msbuild)
+  on-demand           Real-Time OFF permanently (no 24h reset), Manual Scans ON, Nags Silenced
+  cloud-local         Local + Cloud Protection ON, Sample Upload OFF, All Nags Silenced
 
-Granular Order Keys (shieldsheriff order ...):
+Granular Setting Keys (shieldsheriff set ...):
   realtime=on|off     behavior=on|off     ioav=on|off         script=on|off
   cloud=off|basic|advanced                samples=never|prompt|safe|all
   nags=off|on         systray=mute|show   network=off|block|audit

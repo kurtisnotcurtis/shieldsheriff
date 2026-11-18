@@ -8,12 +8,13 @@
   <strong>Granular, Nag-Free Control for Windows 11 Defender.</strong><br />
   <a href="https://kurtisnotcurtis.github.io/shieldsheriff/">Website &amp; Comparison</a> ·
   <a href="https://github.com/kurtisnotcurtis/shieldsheriff/releases">Download Releases</a> ·
+  <a href="CLI.md">CLI Reference</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="DEVELOPMENT.md">Developer Guide</a>
 </p>
 
 <p align="center">
-  <img src="site/preview.png" alt="ShieldSheriff Command Center UI on Windows 11" />
+  <img src="site/preview.png" alt="ShieldSheriff Dashboard UI on Windows 11" />
 </p>
 
 ---
@@ -33,14 +34,14 @@ Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a capable local anti
 
 ## Built-In Presets
 
-Choose a one-click preset from the **Command Center UI**, **System Tray menu**, or **CLI** (`shiesh elect --preset <id> --elevate`), or customize every toggle individually:
+Choose a one-click preset from the **Dashboard** or **System Tray menu**, or customize every toggle individually:
 
-| Preset | ID | What It Does |
-| :--- | :--- | :--- |
-| **Quiet Guardian** *(Default)* | `quiet-guardian` | **Local Real-Time ON**, Cloud Protection **OFF**, Sample Submission **OFF**, all Windows Security nags **Silenced**. |
-| **Developer Workstation** | `dev-workstation` | Keeps core Real-Time scanning ON, turns heavy **Behavior Monitoring** & **Script Scanning** hooks **OFF**, and auto-pauses scanning while `cargo.exe`, `rustc.exe`, `msbuild.exe`, or `link.exe` run. |
-| **On-Demand Only** | `on-demand-only` | Turns **Real-Time Protection OFF permanently** (no 24-hour reset) while keeping manual **Quick Scans** and **Signature Updates** working. |
-| **Full Shield (No Nags)** | `full-shield-no-nag` | Keeps **Local + Cloud Protection ON**, turns automatic file **Sample Uploads OFF**, and silences all Security Center nags. |
+| Preset | What It Does |
+| :--- | :--- |
+| **Local Protection** *(Default)* | **Local Real-Time &amp; Behavior ON**, Cloud Protection **OFF**, Sample Submission **OFF**, all Windows Security nags **Silenced**. |
+| **Workstation** | Keeps core Real-Time scanning ON, turns heavy **Behavior Monitoring** &amp; **Script Scanning** hooks **OFF**, and auto-pauses scanning while `cargo.exe`, `rustc.exe`, `msbuild.exe`, or `link.exe` run. |
+| **On-Demand Only** | Turns **Real-Time Protection OFF permanently** (no 24-hour reset) while keeping manual **Quick Scans** and **Definition Updates** working. |
+| **Cloud + Local** | Keeps **Local + Cloud Protection (MAPS) ON**, turns automatic file **Sample Uploads OFF**, and silences all Security Center nags. |
 
 ---
 
@@ -63,74 +64,31 @@ WinGet installs `shiesh.exe` and adds the `shiesh` command alias to your `PATH`.
 Windows Defender's **Tamper Protection** blocks local apps and Group Policy keys from changing Defender settings. Before applying policies for the first time:
 1. Open **Windows Security → Virus & threat protection → Manage settings** (or run `start windowsdefender://threatsettings`).
 2. Toggle **Tamper Protection** to **Off** once.
-3. ShieldSheriff will silence the resulting Tamper Protection warning notification automatically once your Standing Orders are applied.
+3. ShieldSheriff will silence the resulting Tamper Protection warning notification automatically once your configuration is applied.
 
 ---
 
 ## Getting Started
 
-*(If you extracted the portable `.zip` without adding it to your `PATH`, replace `shiesh` below with `.\shiesh.exe`.)*
-
-### 1. Launch the Command Center UI & System Tray
-```powershell
-# Launch full Command Center UI + persistent System Tray (prompts for Administrator UAC):
-shiesh ui --elevate
-
-# Or open the Command Center UI in Read-Only mode first (no tray; click "Admin" inside the app to elevate):
-shiesh ui
-
-# Launch minimized directly to the persistent System Tray:
-shiesh tray --elevate
-```
-- **Safe First Run:** On first launch, ShieldSheriff opens in **Passive / Read-Only** state and reflects your PC's current Defender configuration without changing anything until you click **Apply Now**.
+### 1. Launch the Dashboard & System Tray
+Open **ShieldSheriff** from the Start Menu (after WinGet install) or double-click `shiesh.exe` / `ShieldSheriff.lnk`:
+- **Safe First Run:** On first launch, ShieldSheriff opens in **Passive / Read-Only** state and reflects your PC's current Defender configuration without changing anything until you click **Admin** (if needed) and **Apply Now**.
 - **Windows 11 Native Look:** Uses WebView2 with Windows 11 Mica backdrop and automatically follows your system Dark/Light theme and accent color.
 - **Three-State System Tray Icon:**
-  - **Preset Mode:** Displays the active preset shield (**Quiet Guardian** blue shield, **Developer Workstation** sky-blue `<>`, **On-Demand Only** red `-`, **Full Shield** green checkmark, or **Custom**).
+  - **Preset Mode:** Displays the active preset shield (**Local Protection** blue shield, **Workstation** sky-blue `<>`, **On-Demand Only** red `-`, **Cloud + Local** green checkmark, or **Custom**).
   - **Pause Mode:** Amber shield with `||` pause bars while Real-Time Protection is paused by timer or a watched process.
   - **Passive Mode:** Hollow slate shield outline when ShieldSheriff is not actively enforcing policies.
 
-### 2. Inspect Live Defender Status (Read-Only Default)
-Running `shiesh` with no arguments (or `shiesh status`) inspects live Defender engines, Tamper Protection, and policy drift without modifying your system or prompting for UAC:
-```powershell
-shiesh
-# Machine-readable JSON output:
-shiesh status --json
-```
-
-### 3. Control Defender from the CLI
-```powershell
-# Apply the default "Quiet Guardian" preset (prompts for Admin UAC with --elevate):
-shiesh elect --elevate
-
-# Apply a specific preset (quiet-guardian, dev-workstation, on-demand-only, full-shield-no-nag):
-shiesh elect --preset dev-workstation --elevate
-
-# Customize individual engine & notification settings (run from an elevated terminal):
-shiesh order realtime=on behavior=off script=off cloud=off samples=never nags=off
-
-# Auto-pause Real-Time Protection whenever specified processes are running:
-shiesh order watch=cargo.exe,msbuild.exe,link.exe,rustc.exe
-
-# Temporarily pause Real-Time Protection for 30 minutes, or resume immediately:
-shiesh pause 30
-shiesh resume
-
-# Run an on-demand Defender Quick Scan or signature update (works even in On-Demand Only mode):
-shiesh scan
-shiesh update
-
-# Install or remove the 24/7 background Windows Service (runs as SYSTEM across reboots):
-shiesh service install
-shiesh service uninstall
-```
+### 2. CLI & Automation
+For scripting, JSON status inspection (`shiesh status --json`), unattended preset application, and service management, see the **[CLI & Automation Reference](CLI.md)**.
 
 ---
 
 ## Reverting to Windows Defaults & Uninstalling
 
-1. **Revert Defender Policies:** Open the Command Center UI (`shiesh ui --elevate`) or right-click the System Tray icon and select **Passive Mode (Stop Enforcing)** to remove ShieldSheriff's policy locks and restore standard Windows Security notifications.
+1. **Revert Defender Policies:** Open the Dashboard or right-click the System Tray icon and select **Passive Mode (Stop Enforcing)** to remove ShieldSheriff's policy locks and restore standard Windows Security notifications.
 2. **Remove Background Service / Startup (if enabled):**
-   - Turn off **Start in Tray at Logon** and **Windows Service** in the **Settings** tab of the UI (or run `shiesh service uninstall` as Administrator).
+   - Turn off **Run at Windows Startup** and click **Remove Service** in the **Settings** tab of the Dashboard (or see [CLI.md](CLI.md)).
 3. **Uninstall the Binary:**
    - **WinGet:** `winget uninstall kurtisnotcurtis.ShieldSheriff`
    - **Portable `.zip`:** Delete `shiesh.exe` and optional config folder `C:\ProgramData\ShieldSheriff`.

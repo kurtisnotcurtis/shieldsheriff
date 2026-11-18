@@ -288,9 +288,9 @@ func (s *Server) handleOrders(w http.ResponseWriter, r *http.Request) {
 	res, err := s.gov.UpdateOrders(orders)
 	msg := fmt.Sprintf("Applied %d setting(s)", len(res.Applied))
 	if !res.Success && len(res.Warnings) > 0 {
-		msg = "Orders saved to disk (" + res.Warnings[0] + ")"
+		msg = "Settings saved (" + res.Warnings[0] + ")"
 	} else if err != nil {
-		msg = "Enforced with save note: " + err.Error()
+		msg = "Applied with save note: " + err.Error()
 	}
 	writeJSON(w, map[string]any{"ok": res.Success, "message": msg, "result": res})
 }
@@ -347,7 +347,7 @@ func (s *Server) handleEnforce(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleFocus(w http.ResponseWriter, r *http.Request) {
 	go s.OpenWindow()
-	writeJSON(w, map[string]any{"ok": true, "message": "Focused Command Center"})
+	writeJSON(w, map[string]any{"ok": true, "message": "Focused ShieldSheriff window"})
 }
 
 func (s *Server) handleElevate(w http.ResponseWriter, r *http.Request) {
