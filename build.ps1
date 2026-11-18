@@ -42,6 +42,27 @@ if ($Test) {
     if ($LASTEXITCODE -ne 0) { throw "go test failed with exit code $LASTEXITCODE" }
 }
 
+$winresExe = (Get-Command go-winres -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1)
+if (-not $winresExe) {
+    $gopath = (go env GOPATH).Trim()
+    if ($gopath) {
+        $candidate = Join-Path $gopath "bin\go-winres.exe"
+        if (Test-Path $candidate) { $winresExe = $candidate }
+    }
+}
+if ($winresExe) {
+    $winVer = "$ver.0"
+    Push-Location (Join-Path $PSScriptRoot "cmd\shieldsheriff")
+    try {
+        & $winresExe make --in winres/winres.json --out rsrc --arch amd64,arm64 --product-version $winVer --file-version $winVer
+        if ($LASTEXITCODE -ne 0) { throw "go-winres failed with exit code $LASTEXITCODE" }
+    } finally {
+        Pop-Location
+    }
+} else {
+    Write-Warning "go-winres not found; building without regenerating .syso resources. Install with: go install github.com/tc-hib/go-winres@v0.3.3"
+}
+
 $env:CGO_ENABLED = "0"
 $env:GOOS = "windows"
 $ldflags = "-s -w -X shieldsheriff/internal/version.Version=$ver -X shieldsheriff/internal/version.ReleasedOn=$relDate"

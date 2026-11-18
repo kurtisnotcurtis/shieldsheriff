@@ -17,6 +17,17 @@ Machine-readable release and platform compatibility metadata is also maintained 
 
 ---
 
+## [2026.11.8] (2026-11-18)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
+
+### Changed
+- **Embedded Application Icon (`cmd/shieldsheriff/winres/`, `internal/tray/icon.go`, `build.ps1`):** Added a 256×256 ShieldSheriff brand icon (`icon.png`) and `RT_GROUP_ICON` resource in `winres.json` so `shiesh.exe` displays its icon in Windows Task Manager and Explorer; updated `build.ps1` to regenerate `.syso` resources automatically when `go-winres` is available.
+- **Consistent Descending Preset Order (`internal/defender/state.go`, `internal/tray/systray.go`, `internal/ui/dashboard.html`, `cmd/shieldsheriff/main.go`, `README.md`, `CLI.md`, `site/`):** Ordered presets consistently by protection level descending (**Cloud + Local** → **Local Protection** → **Workstation** → **On-Demand Only**) everywhere.
+
+---
+
 ## [2026.11.7] (2026-11-18)
 
 * **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)

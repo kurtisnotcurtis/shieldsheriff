@@ -1,4 +1,16 @@
 const PRESETS = {
+  "cloud-local": {
+    name: "Cloud + Local",
+    badgeText: "PROTECTED",
+    badgeClass: "chip-on",
+    rtp: { text: "ON (Locked)", cls: "chip-on" },
+    bm: { text: "ON + Network Protection Block", cls: "chip-on" },
+    cloud: { text: "ON (Advanced MAPS 2)", cls: "chip-on" },
+    samples: { text: "NEVER (No Automatic File Uploads)", cls: "chip-off" },
+    nags: { text: "SILENCED (No Sample/Tamper Nags)", cls: "chip-gold" },
+    watch: { text: "15s Auto-Heal Active", cls: "chip-on" },
+    trayText: "ShieldSheriff: Cloud + Local"
+  },
   "local-protection": {
     name: "Local Protection (Default)",
     badgeText: "PROTECTED",
@@ -34,18 +46,6 @@ const PRESETS = {
     nags: { text: "SILENCED (No Red Shield Warnings)", cls: "chip-gold" },
     watch: { text: "MpCmdRun.exe CLI Scans Still Active", cls: "chip-on" },
     trayText: "ShieldSheriff: On-Demand Only"
-  },
-  "cloud-local": {
-    name: "Cloud + Local",
-    badgeText: "PROTECTED",
-    badgeClass: "chip-on",
-    rtp: { text: "ON (Locked)", cls: "chip-on" },
-    bm: { text: "ON + Network Protection Block", cls: "chip-on" },
-    cloud: { text: "ON (Advanced MAPS 2)", cls: "chip-on" },
-    samples: { text: "NEVER (No Automatic File Uploads)", cls: "chip-off" },
-    nags: { text: "SILENCED (No Sample/Tamper Nags)", cls: "chip-gold" },
-    watch: { text: "15s Auto-Heal Active", cls: "chip-on" },
-    trayText: "ShieldSheriff: Cloud + Local"
   }
 };
 

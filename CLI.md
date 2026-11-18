@@ -42,7 +42,7 @@ shiesh version --json
 # Apply the default "Local Protection" preset (prompts for Admin UAC with --elevate):
 shiesh apply --elevate
 
-# Apply a specific preset (local-protection, workstation, on-demand, cloud-local):
+# Apply a specific preset (cloud-local, local-protection, workstation, on-demand):
 shiesh apply --preset workstation --elevate
 
 # Customize individual engine & notification settings (run from an elevated terminal):
@@ -56,10 +56,10 @@ shiesh set watch=cargo.exe,msbuild.exe,link.exe,rustc.exe
 
 | ID | Name | Summary |
 | :--- | :--- | :--- |
+| `cloud-local` | Cloud + Local | All local engines + Cloud Protection (MAPS) ON, Sample Submission OFF, all nags silenced |
 | `local-protection` | Local Protection *(Default)* | Real-Time & Behavior ON, Cloud OFF, Sample Submission OFF, all nags silenced |
 | `workstation` | Workstation | Real-Time & IOAV ON, Behavior & Script hooks OFF, auto-pauses on `cargo.exe`, `msbuild.exe`, `link.exe`, `rustc.exe` |
 | `on-demand` | On-Demand Only | Real-Time Protection OFF permanently (no 24h reset); manual scans & definition updates active |
-| `cloud-local` | Cloud + Local | All local engines + Cloud Protection (MAPS) ON, Sample Submission OFF, all nags silenced |
 
 ### Granular `shiesh set` Keys
 

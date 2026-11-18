@@ -916,17 +916,11 @@ let hoveredPresetId = null;
 let activeTab = 'orders';
 
 const PRESET_META = {
-  "on-demand": {
-    title: "On-Demand Only",
-    bg: "rgba(248, 113, 113, 0.18)",
-    fg: "#f87171",
-    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2zM5.2 7.25a.75.75 0 0 0 0 1.5h5.6a.75.75 0 0 0 0-1.5H5.2z"/></svg>`
-  },
-  "workstation": {
-    title: "Workstation",
-    bg: "rgba(96, 205, 255, 0.18)",
-    fg: "#60cdff",
-    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2z"/><path d="M6.6 6.1L4.7 8l1.9 1.9M9.4 6.1L11.3 8l-1.9 1.9" fill="none" stroke="#18181b" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  "cloud-local": {
+    title: "Cloud + Local",
+    bg: "rgba(74, 222, 128, 0.18)",
+    fg: "#4ade80",
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2zm3.2 5.1-3.7 3.8a.6.6 0 0 1-.85 0L5.1 8.5a.6.6 0 1 1 .85-.85l1.12 1.13 3.28-3.33a.6.6 0 1 1 .85.85z"/></svg>`
   },
   "local-protection": {
     title: "Local Protection",
@@ -934,19 +928,25 @@ const PRESET_META = {
     fg: "#38bdf8",
     icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2z"/></svg>`
   },
-  "cloud-local": {
-    title: "Cloud + Local",
-    bg: "rgba(74, 222, 128, 0.18)",
-    fg: "#4ade80",
-    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2zm3.2 5.1-3.7 3.8a.6.6 0 0 1-.85 0L5.1 8.5a.6.6 0 1 1 .85-.85l1.12 1.13 3.28-3.33a.6.6 0 1 1 .85.85z"/></svg>`
+  "workstation": {
+    title: "Workstation",
+    bg: "rgba(96, 205, 255, 0.18)",
+    fg: "#60cdff",
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2z"/><path d="M6.6 6.1L4.7 8l1.9 1.9M9.4 6.1L11.3 8l-1.9 1.9" fill="none" stroke="#18181b" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  },
+  "on-demand": {
+    title: "On-Demand Only",
+    bg: "rgba(248, 113, 113, 0.18)",
+    fg: "#f87171",
+    icon: `<svg viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 1.2L2.5 3.3v4.4c0 3.5 2.3 6.1 5.5 7.1 3.2-1 5.5-3.6 5.5-7.1V3.3L8 1.2zM5.2 7.25a.75.75 0 0 0 0 1.5h5.6a.75.75 0 0 0 0-1.5H5.2z"/></svg>`
   }
 };
 
 const PRESET_ORDER = [
-  "on-demand",
-  "workstation",
+  "cloud-local",
   "local-protection",
-  "cloud-local"
+  "workstation",
+  "on-demand"
 ];
 
 function switchTab(tab) {

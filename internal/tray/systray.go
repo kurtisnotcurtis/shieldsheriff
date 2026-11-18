@@ -428,10 +428,10 @@ func (t *AppTray) showContextMenu() {
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 
 	// Presets (top-level)
+	appendMenuItem(hMenu, checkFlag(ord.PresetName == "cloud-local"), cmdPresetFullShield, "Cloud + Local")
 	appendMenuItem(hMenu, checkFlag(ord.PresetName == "local-protection"), cmdPresetQuietGuardian, "Local Protection")
 	appendMenuItem(hMenu, checkFlag(ord.PresetName == "workstation"), cmdPresetDevWork, "Workstation")
 	appendMenuItem(hMenu, checkFlag(ord.PresetName == "on-demand"), cmdPresetOnDemand, "On-Demand Only")
-	appendMenuItem(hMenu, checkFlag(ord.PresetName == "cloud-local"), cmdPresetFullShield, "Cloud + Local")
 
 	procAppendMenuW.Call(hMenu, mfSeparator, 0, 0)
 

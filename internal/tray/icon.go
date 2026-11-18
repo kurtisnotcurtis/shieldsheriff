@@ -1,6 +1,8 @@
 package tray
 
 import (
+	"image"
+	"image/color"
 	"math"
 	"syscall"
 	"unsafe"
@@ -120,6 +122,30 @@ func CreateSheriffBadgeIcon(kind BadgeKind) uintptr {
 	}
 	hIcon, _, _ := procCreateIconIndirect.Call(uintptr(unsafe.Pointer(&ii)))
 	return hIcon
+}
+
+// RenderBadgeNRGBA renders the specified badge kind into a straight-alpha NRGBA image of size x size.
+func RenderBadgeNRGBA(kind BadgeKind, size int) *image.NRGBA {
+	pixels := make([]uint32, size*size)
+	renderSheriffBadgePixels(kind, size, pixels)
+
+	img := image.NewNRGBA(image.Rect(0, 0, size, size))
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			p := pixels[y*size+x]
+			a := uint8(p >> 24)
+			if a == 0 {
+				continue
+			}
+			// Un-premultiply ARGB into straight NRGBA
+			af := float64(a) / 255.0
+			r := uint8(math.Min(255, float64(uint8(p>>16))/af))
+			g := uint8(math.Min(255, float64(uint8(p>>8))/af))
+			b := uint8(math.Min(255, float64(uint8(p))/af))
+			img.SetNRGBA(x, y, color.NRGBA{R: r, G: g, B: b, A: a})
+		}
+	}
+	return img
 }
 
 func renderSheriffBadgePixels(kind BadgeKind, size int, pixels []uint32) {
@@ -279,13 +305,14 @@ func renderSheriffBadgePixels(kind BadgeKind, size int, pixels []uint32) {
 	// Render with 3x3 supersampling
 	const ss = 3
 	const invSS2 = 1.0 / float64(ss*ss)
+	scale := 32.0 / float64(size)
 	for py := 0; py < size; py++ {
 		for px := 0; px < size; px++ {
 			var sumR, sumG, sumB, sumA float64
 			for sy := 0; sy < ss; sy++ {
 				for sx := 0; sx < ss; sx++ {
-					fx := float64(px) + (float64(sx)+0.5)/float64(ss)
-					fy := float64(py) + (float64(sy)+0.5)/float64(ss)
+					fx := (float64(px) + (float64(sx)+0.5)/float64(ss)) * scale
+					fy := (float64(py) + (float64(sy)+0.5)/float64(ss)) * scale
 					sr, sg, sb, sa := sampleColor(fx, fy)
 					sumR += sr * sa
 					sumG += sg * sa

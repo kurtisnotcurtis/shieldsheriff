@@ -38,10 +38,10 @@ Choose a one-click preset from the **Dashboard** or **System Tray menu**, or cus
 
 | Preset | What It Does |
 | :--- | :--- |
+| **Cloud + Local** | Keeps **Local + Cloud Protection (MAPS) ON**, turns automatic file **Sample Uploads OFF**, and silences all Security Center nags. |
 | **Local Protection** *(Default)* | **Local Real-Time &amp; Behavior ON**, Cloud Protection **OFF**, Sample Submission **OFF**, all Windows Security nags **Silenced**. |
 | **Workstation** | Keeps core Real-Time scanning ON, turns heavy **Behavior Monitoring** &amp; **Script Scanning** hooks **OFF**, and auto-pauses scanning while `cargo.exe`, `rustc.exe`, `msbuild.exe`, or `link.exe` run. |
 | **On-Demand Only** | Turns **Real-Time Protection OFF permanently** (no 24-hour reset) while keeping manual **Quick Scans** and **Definition Updates** working. |
-| **Cloud + Local** | Keeps **Local + Cloud Protection (MAPS) ON**, turns automatic file **Sample Uploads OFF**, and silences all Security Center nags. |
 
 ---
 
@@ -75,7 +75,7 @@ Open **ShieldSheriff** from the Start Menu (after WinGet install) or double-clic
 - **Safe First Run:** On first launch, ShieldSheriff opens in **Passive / Read-Only** state and reflects your PC's current Defender configuration without changing anything until you click **Admin** (if needed) and **Apply Now**.
 - **Windows 11 Native Look:** Uses WebView2 with Windows 11 Mica backdrop and automatically follows your system Dark/Light theme and accent color.
 - **Three-State System Tray Icon:**
-  - **Preset Mode:** Displays the active preset shield (**Local Protection** blue shield, **Workstation** sky-blue `<>`, **On-Demand Only** red `-`, **Cloud + Local** green checkmark, or **Custom**).
+  - **Preset Mode:** Displays the active preset shield (**Cloud + Local** green checkmark, **Local Protection** blue shield, **Workstation** sky-blue `<>`, **On-Demand Only** red `-`, or **Custom**).
   - **Pause Mode:** Amber shield with `||` pause bars while Real-Time Protection is paused by timer or a watched process.
   - **Passive Mode:** Hollow slate shield outline when ShieldSheriff is not actively enforcing policies.
 

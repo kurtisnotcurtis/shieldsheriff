@@ -6,7 +6,7 @@ import "fmt"
 // Version and ReleasedOn can be overridden at build time via -ldflags -X from VERSION.json.
 var (
 	// Version is the current CalVer release of ShieldSheriff.
-	Version = "2026.11.7"
+	Version = "2026.11.8"
 
 	// ReleasedOn is the ISO-8601 release date (EST/EDT).
 	ReleasedOn = "2026-11-18"

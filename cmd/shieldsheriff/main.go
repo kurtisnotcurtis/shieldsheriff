@@ -328,7 +328,7 @@ func runApply(args []string) {
 				}
 			}
 			if !found {
-				fmt.Fprintf(os.Stderr, "Unknown preset %q. Available: local-protection, workstation, on-demand, cloud-local\n", presetID)
+				fmt.Fprintf(os.Stderr, "Unknown preset %q. Available: cloud-local, local-protection, workstation, on-demand\n", presetID)
 				os.Exit(1)
 			}
 		}
@@ -567,10 +567,10 @@ func printUsage() {
   shieldsheriff version [--json]        Print CalVer release & Windows Defender platform metadata`)
 	fmt.Println(`
 Presets (--preset):
+  cloud-local         Local + Cloud Protection ON, Sample Upload OFF, All Nags Silenced
   local-protection    Real-Time ON, Cloud OFF, Sample Submission OFF, All Nags Silenced
   workstation         Fast Builds (Behavior/Script hooks OFF, Auto-Pause on cargo/msbuild)
   on-demand           Real-Time OFF permanently (no 24h reset), Manual Scans ON, Nags Silenced
-  cloud-local         Local + Cloud Protection ON, Sample Upload OFF, All Nags Silenced
 
 Granular Setting Keys (shieldsheriff set ...):
   realtime=on|off     behavior=on|off     ioav=on|off         script=on|off
