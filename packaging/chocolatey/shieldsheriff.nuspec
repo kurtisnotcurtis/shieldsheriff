@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>shieldsheriff</id>
+    <version>__CHOCO_VERSION__</version>
+    <packageSourceUrl>https://github.com/kurtisnotcurtis/shieldsheriff/tree/main/packaging/chocolatey</packageSourceUrl>
+    <owners>kurtisnotcurtis</owners>
+    <title>ShieldSheriff</title>
+    <authors>kurtisnotcurtis</authors>
+    <projectUrl>https://kurtisnotcurtis.github.io/shieldsheriff/</projectUrl>
+    <iconUrl>https://cdn.jsdelivr.net/gh/kurtisnotcurtis/shieldsheriff@main/site/logo.svg</iconUrl>
+    <copyright>Copyright (c) 2024-2026 kurtisnotcurtis</copyright>
+    <licenseUrl>https://github.com/kurtisnotcurtis/shieldsheriff/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/kurtisnotcurtis/shieldsheriff</projectSourceUrl>
+    <docsUrl>https://github.com/kurtisnotcurtis/shieldsheriff/blob/main/CLI.md</docsUrl>
+    <bugTrackerUrl>https://github.com/kurtisnotcurtis/shieldsheriff/issues</bugTrackerUrl>
+    <tags>defender windows-defender windows-security security systray cli privacy portable</tags>
+    <summary>Simple, nag-free control for Windows 11 Defender.</summary>
+    <description>ShieldSheriff is a lightweight Windows 11 Defender configuration tool.
+It keeps Microsoft Defender under your chosen settings (Real-Time Protection, Behavior Monitoring, IOAV, Script Scanning, Network Protection, Cloud Protection, and Sample Submission), silences Windows Security Center nags, auto-heals configuration drift, and supports timed or process-aware protection pauses from the Dashboard, System Tray, or CLI.</description>
+    <releaseNotes>https://github.com/kurtisnotcurtis/shieldsheriff/releases/tag/__TAG__</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

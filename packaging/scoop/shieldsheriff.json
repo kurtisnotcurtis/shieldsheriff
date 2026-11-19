@@ -1,0 +1,40 @@
+{
+    "version": "__VERSION__",
+    "description": "Simple, nag-free control for Windows 11 Defender.",
+    "homepage": "https://kurtisnotcurtis.github.io/shieldsheriff/",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/kurtisnotcurtis/shieldsheriff/releases/download/v__VERSION__/shieldsheriff-__VERSION__-windows-amd64.zip",
+            "hash": "__SHA256_AMD64__"
+        },
+        "arm64": {
+            "url": "https://github.com/kurtisnotcurtis/shieldsheriff/releases/download/v__VERSION__/shieldsheriff-__VERSION__-windows-arm64.zip",
+            "hash": "__SHA256_ARM64__"
+        }
+    },
+    "bin": "shiesh.exe",
+    "shortcuts": [
+        [
+            "shiesh.exe",
+            "ShieldSheriff",
+            "ui --elevate"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/kurtisnotcurtis/shieldsheriff"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/kurtisnotcurtis/shieldsheriff/releases/download/v$version/shieldsheriff-$version-windows-amd64.zip"
+            },
+            "arm64": {
+                "url": "https://github.com/kurtisnotcurtis/shieldsheriff/releases/download/v$version/shieldsheriff-$version-windows-arm64.zip"
+            }
+        },
+        "hash": {
+            "url": "$baseurl/SHA256SUMS.txt"
+        }
+    }
+}

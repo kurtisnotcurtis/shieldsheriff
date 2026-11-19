@@ -1,4 +1,4 @@
-name: Release ShieldSheriff (Portable Windows & Winget)
+name: Release ShieldSheriff (Portable Windows, Winget, Scoop & Chocolatey)
 
 on:
   push:
@@ -17,6 +17,10 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      choco_version: ${{ steps.meta.outputs.choco_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,9 +43,11 @@ jobs:
             $tag = "v$($vj.version)"
           }
           $version = $tag.TrimStart("v")
+          $chocoVersion = [regex]::Replace($version, '(^|\.)0+(\d+)', '$1$2')
           $releaseDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "choco_version=$chocoVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "release_date=$releaseDate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Run Tests & Vet
@@ -122,6 +128,55 @@ jobs:
 
           Compress-Archive -Path "dist/winget/*" -DestinationPath "dist/winget-manifests-$ver.zip" -Force
 
+      - name: Render Scoop Manifest
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.meta.outputs.version }}"
+          $shaAmd64 = "${{ steps.build.outputs.sha256_amd64 }}".ToLowerInvariant()
+          $shaArm64 = "${{ steps.build.outputs.sha256_arm64 }}".ToLowerInvariant()
+
+          New-Item -ItemType Directory -Force -Path "dist/scoop" | Out-Null
+          $content = Get-Content "packaging/scoop/shieldsheriff.json" -Raw
+          $content = $content.Replace("__VERSION__", $ver)
+          $content = $content.Replace("__SHA256_AMD64__", $shaAmd64)
+          $content = $content.Replace("__SHA256_ARM64__", $shaArm64)
+          Set-Content -Path "dist/scoop/shieldsheriff.json" -Value $content -Encoding utf8 -NoNewline
+
+      - name: Render & Pack Chocolatey Package
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $ver = "${{ steps.meta.outputs.version }}"
+          $chocoVer = "${{ steps.meta.outputs.choco_version }}"
+          $shaAmd64 = "${{ steps.build.outputs.sha256_amd64 }}".ToLowerInvariant()
+          $shaArm64 = "${{ steps.build.outputs.sha256_arm64 }}".ToLowerInvariant()
+
+          $chocoSrc = "dist/chocolatey-src"
+          New-Item -ItemType Directory -Force -Path $chocoSrc, "dist/chocolatey" | Out-Null
+          Copy-Item "packaging/chocolatey/shieldsheriff.nuspec" -Destination $chocoSrc
+          Copy-Item "packaging/chocolatey/tools" -Destination $chocoSrc -Recurse
+
+          foreach ($file in @("$chocoSrc/shieldsheriff.nuspec", "$chocoSrc/tools/chocolateyinstall.ps1")) {
+            $content = Get-Content $file -Raw
+            $content = $content.Replace("__CHOCO_VERSION__", $chocoVer)
+            $content = $content.Replace("__VERSION__", $ver)
+            $content = $content.Replace("__TAG__", $tag)
+            $content = $content.Replace("__SHA256_AMD64__", $shaAmd64)
+            $content = $content.Replace("__SHA256_ARM64__", $shaArm64)
+            Set-Content -Path $file -Value $content -Encoding utf8 -NoNewline
+          }
+
+          choco pack "$chocoSrc/shieldsheriff.nuspec" --outputdirectory "dist/chocolatey"
+          if ($LASTEXITCODE -ne 0) { throw "choco pack failed with exit code $LASTEXITCODE" }
+
+      - name: Upload Package Artifacts for Publish Jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-manifests
+          path: |
+            dist/scoop/shieldsheriff.json
+            dist/chocolatey/shieldsheriff.${{ steps.meta.outputs.choco_version }}.nupkg
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -133,3 +188,109 @@ jobs:
             dist/shieldsheriff-${{ steps.meta.outputs.version }}-windows-arm64.zip
             dist/SHA256SUMS.txt
             dist/winget-manifests-${{ steps.meta.outputs.version }}.zip
+            dist/scoop/shieldsheriff.json
+            dist/chocolatey/shieldsheriff.${{ steps.meta.outputs.choco_version }}.nupkg
+
+  publish-winget:
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - name: Check WinGet Token
+        id: check
+        shell: pwsh
+        env:
+          WINGET_ACC_TOKEN: ${{ secrets.WINGET_ACC_TOKEN }}
+        run: |
+          $enabled = (-not [string]::IsNullOrWhiteSpace($env:WINGET_ACC_TOKEN)).ToString().ToLowerInvariant()
+          "enabled=$enabled" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ($enabled -eq "false") { Write-Host "WINGET_ACC_TOKEN secret not set; skipping automated WinGet PR." }
+
+      - name: Submit PR to microsoft/winget-pkgs
+        if: steps.check.outputs.enabled == 'true'
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: kurtisnotcurtis.ShieldSheriff
+          version: ${{ needs.release.outputs.version }}
+          release-tag: ${{ needs.release.outputs.tag }}
+          installers-regex: '^shieldsheriff-.*-windows-(amd64|arm64)\.zip$'
+          token: ${{ secrets.WINGET_ACC_TOKEN }}
+
+  publish-scoop:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Scoop Bucket Token
+        id: check
+        shell: bash
+        env:
+          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        run: |
+          if [ -n "$SCOOP_BUCKET_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "SCOOP_BUCKET_TOKEN secret not set; skipping automated Scoop bucket update."
+          fi
+
+      - name: Download Scoop Manifest
+        if: steps.check.outputs.enabled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: package-manifests
+          path: rendered
+
+      - name: Checkout Scoop Bucket
+        if: steps.check.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.SCOOP_BUCKET_REPO || format('{0}/scoop-bucket', github.repository_owner) }}
+          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          path: scoop-bucket
+
+      - name: Commit & Push Updated Manifest
+        if: steps.check.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          mkdir -p scoop-bucket/bucket
+          cp rendered/scoop/shieldsheriff.json scoop-bucket/bucket/shieldsheriff.json
+          cd scoop-bucket
+          if git diff --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "Scoop manifest already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bucket/shieldsheriff.json
+          git commit -m "chore(shieldsheriff): update to v${{ needs.release.outputs.version }}"
+          git push
+
+  publish-chocolatey:
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - name: Check Chocolatey API Key
+        id: check
+        shell: pwsh
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+        run: |
+          $enabled = (-not [string]::IsNullOrWhiteSpace($env:CHOCO_API_KEY)).ToString().ToLowerInvariant()
+          "enabled=$enabled" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ($enabled -eq "false") { Write-Host "CHOCO_API_KEY secret not set; skipping automated Chocolatey push." }
+
+      - name: Download Chocolatey Package
+        if: steps.check.outputs.enabled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: package-manifests
+          path: rendered
+
+      - name: Push to Chocolatey Community Repository
+        if: steps.check.outputs.enabled == 'true'
+        shell: pwsh
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+        run: |
+          $nupkg = "rendered/chocolatey/shieldsheriff.${{ needs.release.outputs.choco_version }}.nupkg"
+          choco push $nupkg --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+          if ($LASTEXITCODE -ne 0) { throw "choco push failed with exit code $LASTEXITCODE" }

@@ -40,7 +40,10 @@ shieldsheriff/
 │   └── version/
 │       ├── version.go              # CalVer (YYYY.0M.MICRO) release & Defender platform compatibility metadata
 │       └── version_test.go         # Enforces version sync across VERSION.json, version.go, and CHANGELOG.md
-├── packaging/winget/               # WinGet manifest templates rendered during GitHub Releases
+├── packaging/
+│   ├── chocolatey/                 # Chocolatey .nuspec & install/uninstall templates
+│   ├── scoop/                      # Scoop manifest template with checkver & autoupdate
+│   └── winget/                     # WinGet manifest templates rendered during GitHub Releases
 ├── site/                           # Static website & feature comparison (index.html, styles.css, app.js)
 ├── build.ps1                       # Reproducible local release build script (`.\build.ps1 -Test`)
 ├── CHANGELOG.md                    # CalVer release history & Windows Defender evolution log
@@ -124,4 +127,4 @@ ShieldSheriff uses **Calendar Versioning (`YYYY.0M.MICRO`)** because Microsoft D
 2. [`internal/version/version.go`](internal/version/version.go)
 3. [`CHANGELOG.md`](CHANGELOG.md)
 
-Pushing a version tag (`vYYYY.0M.MICRO`) triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which runs the test suite, builds portable `amd64` and `arm64` `.zip` archives, computes `SHA256SUMS.txt`, renders the WinGet manifests from [`packaging/winget/`](packaging/winget/README.md), and publishes the GitHub Release.
+Pushing a version tag (`vYYYY.0M.MICRO`) triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which runs the test suite, builds portable `amd64` and `arm64` `.zip` archives, computes `SHA256SUMS.txt`, renders manifests/packages for [WinGet](packaging/winget/README.md), [Scoop](packaging/scoop/README.md), and [Chocolatey](packaging/chocolatey/README.md), publishes the GitHub Release, and optionally runs automated publish jobs when `WINGET_ACC_TOKEN`, `SCOOP_BUCKET_TOKEN`, or `CHOCO_API_KEY` secrets are configured.
