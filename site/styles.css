@@ -713,6 +713,19 @@ section {
   color: var(--text-secondary);
 }
 
+.cmd-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0 8px;
+  max-width: 100%;
+}
+
+.cmd-stack .cmd-copy {
+  margin: 0;
+}
+
 .cmd-copy {
   display: inline-flex;
   align-items: center;

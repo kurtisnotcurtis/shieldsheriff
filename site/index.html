@@ -392,9 +392,15 @@
             <div class="v-icon">1</div>
             <div class="v-text">
               <strong>Install ShieldSheriff</strong>
-              <div class="cmd-copy">
-                <code>winget install kurtisnotcurtis.ShieldSheriff</code>
-                <button type="button" class="cmd-copy-btn" onclick="copyCommand(this, 'winget install kurtisnotcurtis.ShieldSheriff')">Copy</button>
+              <div class="cmd-stack">
+                <div class="cmd-copy">
+                  <code>winget install kurtisnotcurtis.ShieldSheriff</code>
+                  <button type="button" class="cmd-copy-btn" onclick="copyCommand(this, 'winget install kurtisnotcurtis.ShieldSheriff')">Copy</button>
+                </div>
+                <div class="cmd-copy">
+                  <code>scoop bucket add kurtisnotcurtis https://github.com/kurtisnotcurtis/scoop-bucket; scoop install kurtisnotcurtis/shieldsheriff</code>
+                  <button type="button" class="cmd-copy-btn" onclick="copyCommand(this, 'scoop bucket add kurtisnotcurtis https://github.com/kurtisnotcurtis/scoop-bucket; scoop install kurtisnotcurtis/shieldsheriff')">Copy</button>
+                </div>
               </div>
               <span>Or extract the portable <code>.zip</code> from <a href="https://github.com/kurtisnotcurtis/shieldsheriff/releases" style="color: var(--gold);">GitHub Releases</a>.</span>
             </div>

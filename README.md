@@ -55,7 +55,14 @@ winget install kurtisnotcurtis.ShieldSheriff
 ```
 WinGet installs `shiesh.exe` and adds the `shiesh` command alias to your `PATH`.
 
-### Option 2: Portable `.zip` Archive
+### Option 2: Install via Scoop
+```powershell
+scoop bucket add kurtisnotcurtis https://github.com/kurtisnotcurtis/scoop-bucket
+scoop install kurtisnotcurtis/shieldsheriff
+```
+Scoop installs `shiesh.exe`, adds `shiesh` to your `PATH`, and creates the **ShieldSheriff** Start Menu shortcut.
+
+### Option 3: Portable `.zip` Archive
 1. Download `shieldsheriff-<version>-windows-amd64.zip` (or `arm64.zip`) from [GitHub Releases](https://github.com/kurtisnotcurtis/shieldsheriff/releases).
 2. Extract `shiesh.exe` into a permanent folder (for example, `C:\Tools\ShieldSheriff\`).
    > **Note for Portable Users:** If you enable **Start in System Tray at Windows Logon** or install the **Background Service**, Windows registers the current path of `shiesh.exe`. Place `shiesh.exe` in its permanent folder before enabling startup/service options.
@@ -71,7 +78,7 @@ Windows Defender's **Tamper Protection** blocks local apps and Group Policy keys
 ## Getting Started
 
 ### 1. Launch the Dashboard & System Tray
-Open **ShieldSheriff** from the Start Menu (after WinGet install) or double-click `shiesh.exe` / `ShieldSheriff.lnk`:
+Open **ShieldSheriff** from the Start Menu (after WinGet or Scoop install) or double-click `shiesh.exe` / `ShieldSheriff.lnk`:
 - **Safe First Run:** On first launch, ShieldSheriff opens in **Passive / Read-Only** state and reflects your PC's current Defender configuration without changing anything until you click **Admin** (if needed) and **Apply Now**.
 - **Windows 11 Native Look:** Uses WebView2 with Windows 11 Mica backdrop and automatically follows your system Dark/Light theme and accent color.
 - **Three-State System Tray Icon:**
@@ -91,6 +98,7 @@ For scripting, JSON status inspection (`shiesh status --json`), unattended prese
    - Turn off **Run at Windows Startup** and click **Remove Service** in the **Settings** tab of the Dashboard (or see [CLI.md](CLI.md)).
 3. **Uninstall the Binary:**
    - **WinGet:** `winget uninstall kurtisnotcurtis.ShieldSheriff`
+   - **Scoop:** `scoop uninstall shieldsheriff`
    - **Portable `.zip`:** Delete `shiesh.exe` and optional config folder `C:\ProgramData\ShieldSheriff`.
 
 ---
