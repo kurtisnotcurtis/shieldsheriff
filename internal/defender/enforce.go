@@ -1,291 +1,208 @@
 package defender
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
-	"strings"
-	"syscall"
-	"unsafe"
+	"time"
 )
 
-func regWriteDword(root uintptr, subkey, valueName string, val uint32) error {
-	subkeyPtr, err := syscall.UTF16PtrFromString(subkey)
-	if err != nil {
-		return err
-	}
-	var hKey uintptr
-	var disposition uint32
-	ret, _, _ := procRegCreateKeyExW.Call(
-		root,
-		uintptr(unsafe.Pointer(subkeyPtr)),
-		0,
-		0,
-		0,
-		keyWrite|keyWow6464Key,
-		0,
-		uintptr(unsafe.Pointer(&hKey)),
-		uintptr(unsafe.Pointer(&disposition)),
-	)
-	if ret != 0 {
-		return fmt.Errorf("RegCreateKeyExW(%s) failed with code %d", subkey, ret)
-	}
-	defer procRegCloseKey.Call(hKey)
+const (
+	wmiSyncTimeout   = 15 * time.Second
+	taskkillTimeout  = 5 * time.Second
+	quickScanTimeout = 10 * time.Minute
+	sigUpdateTimeout = 2 * time.Minute
+)
 
-	valPtr, err := syscall.UTF16PtrFromString(valueName)
-	if err != nil {
-		return err
-	}
-	ret, _, _ = procRegSetValueExW.Call(
-		hKey,
-		uintptr(unsafe.Pointer(valPtr)),
-		0,
-		regDword,
-		uintptr(unsafe.Pointer(&val)),
-		4,
-	)
-	if ret != 0 {
-		return fmt.Errorf("RegSetValueExW(%s\\%s) failed with code %d", subkey, valueName, ret)
-	}
-	return nil
-}
-
-func regWriteString(root uintptr, subkey, valueName string, val string, valType uint32) error {
-	subkeyPtr, err := syscall.UTF16PtrFromString(subkey)
-	if err != nil {
-		return err
-	}
-	var hKey uintptr
-	var disposition uint32
-	ret, _, _ := procRegCreateKeyExW.Call(
-		root,
-		uintptr(unsafe.Pointer(subkeyPtr)),
-		0,
-		0,
-		0,
-		keyWrite|keyWow6464Key,
-		0,
-		uintptr(unsafe.Pointer(&hKey)),
-		uintptr(unsafe.Pointer(&disposition)),
-	)
-	if ret != 0 {
-		return fmt.Errorf("RegCreateKeyExW(%s) failed with code %d", subkey, ret)
-	}
-	defer procRegCloseKey.Call(hKey)
-
-	valPtr, err := syscall.UTF16PtrFromString(valueName)
-	if err != nil {
-		return err
-	}
-	utf16Slice, err := syscall.UTF16FromString(val)
-	if err != nil {
-		return err
-	}
-	byteLen := uint32(len(utf16Slice) * 2)
-	ret, _, _ = procRegSetValueExW.Call(
-		hKey,
-		uintptr(unsafe.Pointer(valPtr)),
-		0,
-		uintptr(valType),
-		uintptr(unsafe.Pointer(&utf16Slice[0])),
-		uintptr(byteLen),
-	)
-	if ret != 0 {
-		return fmt.Errorf("RegSetValueExW(%s\\%s) failed with code %d", subkey, valueName, ret)
-	}
-	return nil
-}
-
-func regDeleteVal(root uintptr, subkey, valueName string) error {
-	subkeyPtr, err := syscall.UTF16PtrFromString(subkey)
-	if err != nil {
-		return err
-	}
-	var hKey uintptr
-	ret, _, _ := procRegOpenKeyExW.Call(
-		root,
-		uintptr(unsafe.Pointer(subkeyPtr)),
-		0,
-		keyWrite|keyWow6464Key,
-		uintptr(unsafe.Pointer(&hKey)),
-	)
-	if ret != 0 {
-		return nil // Key doesn't exist
-	}
-	defer procRegCloseKey.Call(hKey)
-
-	valPtr, err := syscall.UTF16PtrFromString(valueName)
-	if err != nil {
-		return err
-	}
-	ret, _, _ = procRegDeleteValueW.Call(hKey, uintptr(unsafe.Pointer(valPtr)))
-	if ret != 0 && ret != 2 { // 2 = ERROR_FILE_NOT_FOUND
-		return fmt.Errorf("RegDeleteValueW(%s\\%s) failed with code %d", subkey, valueName, ret)
-	}
-	return nil
-}
-
-// EnforceResult reports the outcome of applying StandingOrders.
+// EnforceResult reports the outcome of applying or reverting Defender policies.
 type EnforceResult struct {
 	Success  bool     `json:"success"`
 	Applied  []string `json:"applied"`
 	Warnings []string `json:"warnings"`
 }
 
-// Enforce applies the StandingOrders (and optional StandDownState override) to:
-//  1. Windows Group Policy keys (HKLM\SOFTWARE\Policies\Microsoft\Windows Defender & Windows Defender Security Center)
-//  2. Windows Defender live keys (HKLM\SOFTWARE\Microsoft\Windows Defender)
-//  3. Live WMI MSFT_MpPreference via DCOM CimSession so MsMpEng.exe reloads immediately
-func Enforce(orders StandingOrders, standDown *StandDownState) EnforceResult {
+type dwordWrite struct {
+	root   RegRoot
+	subkey string
+	name   string
+	val    uint32
+	label  string // optional human-readable Applied summary
+}
+
+// Enforce applies the Policy (and optional PauseState override) using the default Windows Backend.
+func Enforce(policy Policy, pause *PauseState) EnforceResult {
+	return EnforceWith(DefaultBackend(), policy, pause)
+}
+
+// EnforceWith applies Policy via Group Policy keys, live Defender keys, and PowerShell DCOM Set-MpPreference.
+// All registry write errors are tracked and propagated; Success is false if any required write fails.
+func EnforceWith(b Backend, policy Policy, pause *PauseState) EnforceResult {
 	res := EnforceResult{Success: true}
 
-	if !IsProcessElevated() {
+	if err := policy.Validate(); err != nil {
 		res.Success = false
-		res.Warnings = append(res.Warnings, "Process is not elevated (Administrator / SYSTEM required to enforce policies)")
+		res.Warnings = append(res.Warnings, err.Error())
+		return res
+	}
+	if !b.IsElevated() {
+		res.Success = false
+		res.Warnings = append(res.Warnings, "Administrator privileges required to enforce Defender policies")
 		return res
 	}
 
-	const (
-		polBase       = `SOFTWARE\Policies\Microsoft\Windows Defender`
-		polRTP        = `SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection`
-		polSpynet     = `SOFTWARE\Policies\Microsoft\Windows Defender\Spynet`
-		polNetProt    = `SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection`
-		polUX         = `SOFTWARE\Policies\Microsoft\Windows Defender\UX Configuration`
-		polWSCNotif   = `SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications`
-		polWSCSystray = `SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray`
+	if err := CaptureSnapshotIfMissing(b); err != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("Failed to capture pre-change registry snapshot: %v", err))
+	}
 
-		defRTP     = `SOFTWARE\Microsoft\Windows Defender\Real-Time Protection`
-		defSpynet  = `SOFTWARE\Microsoft\Windows Defender\Spynet`
-		defNetProt = `SOFTWARE\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection`
-		defUX      = `SOFTWARE\Microsoft\Windows Defender\UX Configuration`
-
-		winRunKey   = `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
-		sheriffBack = `SOFTWARE\ShieldSheriff\Backup`
-		toastSecKey = `Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.SecurityAndMaintenance`
-	)
-
-	effectiveRTP := orders.RealtimeProtection
-	if standDown != nil && standDown.Active {
+	effectiveRTP := policy.RealtimeProtection
+	if pause != nil && pause.Active {
 		effectiveRTP = false
 	}
 
-	boolToDisDword := func(enabled bool) uint32 {
+	boolToDis := func(enabled bool) uint32 {
 		if enabled {
 			return 0 // Disable* = 0 means Enabled
 		}
 		return 1 // Disable* = 1 means Disabled
 	}
 
-	// 1. Keep Defender Service Alive (Never set DisableAntiSpyware=1, so on-demand scans & updates stay alive)
-	_ = regWriteDword(hkeyLocalMachine, polBase, "DisableAntiSpyware", 0)
-	_ = regWriteDword(hkeyLocalMachine, polBase, "DisableAntiVirus", 0)
-
-	// 2. Nag & Notification Suppression (Works even if Tamper Protection is still ON!)
-	if orders.SuppressAllNags {
-		if err := regWriteDword(hkeyLocalMachine, polWSCNotif, "DisableNotifications", 1); err == nil {
-			res.Applied = append(res.Applied, "Suppressed Windows Security Center Toast Notifications (DisableNotifications=1)")
-		} else {
-			res.Warnings = append(res.Warnings, err.Error())
-		}
-		if err := regWriteDword(hkeyLocalMachine, polWSCNotif, "DisableEnhancedNotifications", 1); err == nil {
-			res.Applied = append(res.Applied, "Suppressed Cloud/Sample/Tamper Nags (DisableEnhancedNotifications=1)")
-		}
-		_ = regWriteDword(hkeyLocalMachine, polUX, "Notification_Suppress", 1)
-		_ = regWriteDword(hkeyLocalMachine, defUX, "Notification_Suppress", 1)
-		_ = regWriteDword(hkeyCurrentUser, toastSecKey, "Enabled", 0)
-	} else {
-		_ = regWriteDword(hkeyLocalMachine, polWSCNotif, "DisableNotifications", 0)
-		_ = regWriteDword(hkeyLocalMachine, polUX, "Notification_Suppress", 0)
-		_ = regWriteDword(hkeyCurrentUser, toastSecKey, "Enabled", 1)
-		if orders.SuppressEnhancedNags {
-			_ = regWriteDword(hkeyLocalMachine, polWSCNotif, "DisableEnhancedNotifications", 1)
-			res.Applied = append(res.Applied, "Suppressed Non-Critical Enhanced Nags (DisableEnhancedNotifications=1)")
-		} else {
-			_ = regWriteDword(hkeyLocalMachine, polWSCNotif, "DisableEnhancedNotifications", 0)
-		}
-	}
-
-	// 3. Windows Security Systray Icon Muting
-	if orders.MuteWindowsSecSystray {
-		_ = regWriteDword(hkeyLocalMachine, polWSCSystray, "HideSystray", 1)
-		if curRun, ok := regReadString(hkeyLocalMachine, winRunKey, "SecurityHealth"); ok && curRun != "" {
-			_ = regWriteString(hkeyLocalMachine, sheriffBack, "SecurityHealthRun", curRun, regExpandSz)
-			_ = regDeleteVal(hkeyLocalMachine, winRunKey, "SecurityHealth")
-		}
-		// Gently stop running SecurityHealthSystray.exe if active
-		killCmd := exec.Command("taskkill.exe", "/F", "/IM", "SecurityHealthSystray.exe")
-		killCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-		_ = killCmd.Run()
-		res.Applied = append(res.Applied, "Muted Windows Security default tray icon (HideSystray=1)")
-	} else {
-		_ = regWriteDword(hkeyLocalMachine, polWSCSystray, "HideSystray", 0)
-		if _, ok := regReadString(hkeyLocalMachine, winRunKey, "SecurityHealth"); !ok {
-			backupVal, hasBackup := regReadString(hkeyLocalMachine, sheriffBack, "SecurityHealthRun")
-			if !hasBackup || backupVal == "" {
-				backupVal = `%windir%\system32\SecurityHealthSystray.exe`
-			}
-			_ = regWriteString(hkeyLocalMachine, winRunKey, "SecurityHealth", backupVal, regExpandSz)
-		}
-	}
-
-	// 4. Granular Engine Policy Locks (HKLM\SOFTWARE\Policies\Microsoft\Windows Defender)
-	disRTP := boolToDisDword(effectiveRTP)
-	disBM := boolToDisDword(orders.BehaviorMonitoring)
-	disIOAV := boolToDisDword(orders.IOAVProtection)
-	disScript := boolToDisDword(orders.ScriptScanning)
-
-	if err := regWriteDword(hkeyLocalMachine, polRTP, "DisableRealtimeMonitoring", disRTP); err == nil {
-		res.Applied = append(res.Applied, fmt.Sprintf("Policy DisableRealtimeMonitoring=%d", disRTP))
-	}
-	_ = regWriteDword(hkeyLocalMachine, polRTP, "DisableBehaviorMonitoring", disBM)
-	_ = regWriteDword(hkeyLocalMachine, polRTP, "DisableIOAVProtection", disIOAV)
-	_ = regWriteDword(hkeyLocalMachine, polRTP, "DisableScriptScanning", disScript)
+	disRTP := boolToDis(effectiveRTP)
+	disBM := boolToDis(policy.BehaviorMonitoring)
+	disIOAV := boolToDis(policy.IOAVProtection)
+	disScript := boolToDis(policy.ScriptScanning)
+	var disScanOnEnable uint32
 	if !effectiveRTP {
-		_ = regWriteDword(hkeyLocalMachine, polRTP, "DisableScanOnRealtimeEnable", 1)
-	} else {
-		_ = regWriteDword(hkeyLocalMachine, polRTP, "DisableScanOnRealtimeEnable", 0)
+		disScanOnEnable = 1
+	}
+	var disBlockFirstSeen uint32
+	if policy.CloudProtection == 0 {
+		disBlockFirstSeen = 1
 	}
 
-	// Cloud & Sample Policy Locks
-	_ = regWriteDword(hkeyLocalMachine, polSpynet, "SpynetReporting", orders.CloudProtection)
-	_ = regWriteDword(hkeyLocalMachine, polSpynet, "SubmitSamplesConsent", orders.SampleSubmission)
-	if orders.CloudProtection == 0 {
-		_ = regWriteDword(hkeyLocalMachine, polSpynet, "DisableBlockAtFirstSeen", 1)
+	var disNotif, disEnhNotif, notifSuppress, toastEnabled uint32
+	if policy.SuppressAllNags {
+		disNotif = 1
+		disEnhNotif = 1
+		notifSuppress = 1
+		toastEnabled = 0
 	} else {
-		_ = regWriteDword(hkeyLocalMachine, polSpynet, "DisableBlockAtFirstSeen", 0)
+		disNotif = 0
+		notifSuppress = 0
+		toastEnabled = 1
+		if policy.SuppressEnhancedNags {
+			disEnhNotif = 1
+		}
 	}
-	res.Applied = append(res.Applied, fmt.Sprintf("Policy SpynetReporting=%d, SubmitSamplesConsent=%d", orders.CloudProtection, orders.SampleSubmission))
 
-	// Network Protection Policy Lock
-	_ = regWriteDword(hkeyLocalMachine, polNetProt, "EnableNetworkProtection", orders.NetworkProtection)
+	var hideSystray uint32
+	if policy.MuteWindowsSecSystray {
+		hideSystray = 1
+	}
 
-	// 5. Direct Live Engine Registry Keys (succeeds when Tamper Protection is OFF)
-	_ = regWriteDword(hkeyLocalMachine, defRTP, "DisableRealtimeMonitoring", disRTP)
-	_ = regWriteDword(hkeyLocalMachine, defRTP, "DisableBehaviorMonitoring", disBM)
-	_ = regWriteDword(hkeyLocalMachine, defRTP, "DisableIOAVProtection", disIOAV)
-	_ = regWriteDword(hkeyLocalMachine, defRTP, "DisableScriptScanning", disScript)
-	_ = regWriteDword(hkeyLocalMachine, defSpynet, "SpyNetReporting", orders.CloudProtection)
-	_ = regWriteDword(hkeyLocalMachine, defSpynet, "SubmitSamplesConsent", orders.SampleSubmission)
-	_ = regWriteDword(hkeyLocalMachine, defNetProt, "EnableNetworkProtection", orders.NetworkProtection)
+	writes := []dwordWrite{
+		// Keep Defender service alive so on-demand scans and signature updates remain available
+		{HKLM, keyPolBase, "DisableAntiSpyware", 0, ""},
+		{HKLM, keyPolBase, "DisableAntiVirus", 0, ""},
 
-	// 6. Live WMI MSFT_MpPreference Sync via DCOM CimSession (works even when WinRM/WSMan is off)
-	if err := syncWMIPreferences(effectiveRTP, orders); err != nil {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("WMI live sync note: %v (Policy registry locks are still applied)", err))
+		// Notifications & Security Center nags
+		{HKLM, keyPolWSCNotif, "DisableNotifications", disNotif, fmt.Sprintf("Policy DisableNotifications=%d", disNotif)},
+		{HKLM, keyPolWSCNotif, "DisableEnhancedNotifications", disEnhNotif, fmt.Sprintf("Policy DisableEnhancedNotifications=%d", disEnhNotif)},
+		{HKLM, keyPolUX, "Notification_Suppress", notifSuppress, ""},
+		{HKLM, keyDefUX, "Notification_Suppress", notifSuppress, ""},
+		{HKCU, keyToastSec, "Enabled", toastEnabled, ""},
+		{HKLM, keyPolWSCSystray, "HideSystray", hideSystray, fmt.Sprintf("Policy HideSystray=%d", hideSystray)},
+
+		// Granular Engine Policy Locks
+		{HKLM, keyPolRTP, "DisableRealtimeMonitoring", disRTP, fmt.Sprintf("Policy DisableRealtimeMonitoring=%d", disRTP)},
+		{HKLM, keyPolRTP, "DisableBehaviorMonitoring", disBM, fmt.Sprintf("Policy DisableBehaviorMonitoring=%d", disBM)},
+		{HKLM, keyPolRTP, "DisableIOAVProtection", disIOAV, fmt.Sprintf("Policy DisableIOAVProtection=%d", disIOAV)},
+		{HKLM, keyPolRTP, "DisableScriptScanning", disScript, fmt.Sprintf("Policy DisableScriptScanning=%d", disScript)},
+		{HKLM, keyPolRTP, "DisableScanOnRealtimeEnable", disScanOnEnable, ""},
+
+		// Cloud & Sample Policy Locks
+		{HKLM, keyPolSpynet, "SpynetReporting", policy.CloudProtection, fmt.Sprintf("Policy SpynetReporting=%d", policy.CloudProtection)},
+		{HKLM, keyPolSpynet, "SubmitSamplesConsent", policy.SampleSubmission, fmt.Sprintf("Policy SubmitSamplesConsent=%d", policy.SampleSubmission)},
+		{HKLM, keyPolSpynet, "DisableBlockAtFirstSeen", disBlockFirstSeen, ""},
+
+		// Network Protection Policy Lock
+		{HKLM, keyPolNetProt, "EnableNetworkProtection", policy.NetworkProtection, fmt.Sprintf("Policy EnableNetworkProtection=%d", policy.NetworkProtection)},
+	}
+
+	for _, w := range writes {
+		if err := b.WriteDword(w.root, w.subkey, w.name, w.val); err != nil {
+			res.Success = false
+			res.Warnings = append(res.Warnings, err.Error())
+			continue
+		}
+		if w.label != "" {
+			res.Applied = append(res.Applied, w.label)
+		}
+	}
+
+	// Windows Security Systray Run entry
+	if policy.MuteWindowsSecSystray {
+		if err := b.DeleteValue(HKLM, keyWinRun, "SecurityHealth"); err != nil {
+			res.Success = false
+			res.Warnings = append(res.Warnings, err.Error())
+		} else {
+			res.Applied = append(res.Applied, "Muted Windows Security tray autorun")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), taskkillTimeout)
+		_, _ = b.RunCommand(ctx, "taskkill.exe", "/F", "/IM", "SecurityHealthSystray.exe")
+		cancel()
 	} else {
-		res.Applied = append(res.Applied, "Synchronized live MsMpEng.exe engine via WMI (MSFT_MpPreference)")
+		if _, _, ok := b.ReadString(HKLM, keyWinRun, "SecurityHealth"); !ok {
+			restoreVal := defaultSecurityHealthRun
+			if snap, hasSnap, _ := loadSnapshot(b); hasSnap {
+				runID := managedRegSpec{HKLM, keyWinRun, "SecurityHealth", RegExpandSZ}.keyID()
+				if e, ok := snap.Entries[runID]; ok && e.Exists && e.StringVal != "" {
+					restoreVal = e.StringVal
+				}
+			}
+			if err := b.WriteString(HKLM, keyWinRun, "SecurityHealth", restoreVal, RegExpandSZ); err != nil {
+				res.Warnings = append(res.Warnings, err.Error())
+			}
+		}
+	}
+
+	// Direct Live Defender Keys (succeeds when Tamper Protection is OFF; failures recorded as warnings)
+	liveWrites := []dwordWrite{
+		{HKLM, keyDefRTP, "DisableRealtimeMonitoring", disRTP, ""},
+		{HKLM, keyDefRTP, "DisableBehaviorMonitoring", disBM, ""},
+		{HKLM, keyDefRTP, "DisableIOAVProtection", disIOAV, ""},
+		{HKLM, keyDefRTP, "DisableScriptScanning", disScript, ""},
+		{HKLM, keyDefSpynet, "SpyNetReporting", policy.CloudProtection, ""},
+		{HKLM, keyDefSpynet, "SubmitSamplesConsent", policy.SampleSubmission, ""},
+		{HKLM, keyDefNetProt, "EnableNetworkProtection", policy.NetworkProtection, ""},
+	}
+	liveWriteFailed := false
+	for _, w := range liveWrites {
+		if err := b.WriteDword(w.root, w.subkey, w.name, w.val); err != nil {
+			liveWriteFailed = true
+			res.Warnings = append(res.Warnings, fmt.Sprintf("Live key write failed (%s\\%s): %v", w.subkey, w.name, err))
+		}
+	}
+
+	// Live WMI MSFT_MpPreference sync via PowerShell DCOM CimSession (bounded by timeout)
+	if err := syncWMIPreferences(b, effectiveRTP, policy); err != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("WMI live sync failed: %v", err))
+		if liveWriteFailed {
+			res.Success = false
+		}
+	} else {
+		res.Applied = append(res.Applied, "Synchronized live Defender engine via DCOM Set-MpPreference")
 	}
 
 	return res
 }
 
-func syncWMIPreferences(effectiveRTP bool, orders StandingOrders) error {
-	psBool := func(b bool) string {
-		if b {
+func syncWMIPreferences(b Backend, effectiveRTP bool, policy Policy) error {
+	psBool := func(v bool) string {
+		if v {
 			return "$true"
 		}
 		return "$false"
 	}
 
-	// Build a single fast PowerShell command using DCOM CimSession so it never fails on disabled WSMan
 	script := fmt.Sprintf(
 		`$ErrorActionPreference = 'Stop'; `+
 			`$opt = New-CimSessionOption -Protocol Dcom; `+
@@ -301,97 +218,174 @@ func syncWMIPreferences(effectiveRTP bool, orders StandingOrders) error {
 			`-EnableNetworkProtection %d `+
 			`} finally { Remove-CimSession $s -ErrorAction SilentlyContinue }`,
 		psBool(!effectiveRTP),
-		psBool(!orders.BehaviorMonitoring),
-		psBool(!orders.IOAVProtection),
-		psBool(!orders.ScriptScanning),
-		orders.CloudProtection,
-		orders.SampleSubmission,
-		orders.NetworkProtection,
+		psBool(!policy.BehaviorMonitoring),
+		psBool(!policy.IOAVProtection),
+		psBool(!policy.ScriptScanning),
+		policy.CloudProtection,
+		policy.SampleSubmission,
+		policy.NetworkProtection,
 	)
 
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	out, err := cmd.CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), wmiSyncTimeout)
+	defer cancel()
+
+	out, err := b.RunCommand(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script)
 	if err != nil {
-		return fmt.Errorf("%v (%s)", err, strings.TrimSpace(string(out)))
+		if out != "" {
+			return fmt.Errorf("%w (%s)", err, out)
+		}
+		return err
 	}
 	return nil
 }
 
-// RevertPolicies removes ShieldSheriff's Group Policy locks and restores the
-// Windows Security tray autorun entry so the system returns to pre-ShieldSheriff defaults.
+// RevertPolicies restores all Defender and Security Center registry values modified by ShieldSheriff
+// using the default Windows Backend.
 func RevertPolicies() EnforceResult {
+	return RevertPoliciesWith(DefaultBackend())
+}
+
+// RevertPoliciesWith restores every managed registry key to its pre-ShieldSheriff snapshot
+// (or Windows defaults if no snapshot exists) and syncs the live engine via DCOM Set-MpPreference.
+func RevertPoliciesWith(b Backend) EnforceResult {
 	res := EnforceResult{Success: true}
-	if !IsProcessElevated() {
+	if !b.IsElevated() {
 		res.Success = false
 		res.Warnings = append(res.Warnings, "Administrator privileges required to revert policies")
 		return res
 	}
 
-	const (
-		polRTP        = `SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection`
-		polSpynet     = `SOFTWARE\Policies\Microsoft\Windows Defender\Spynet`
-		polNetProt    = `SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection`
-		polUX         = `SOFTWARE\Policies\Microsoft\Windows Defender\UX Configuration`
-		polWSCNotif   = `SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Notifications`
-		polWSCSystray = `SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray`
-		winRunKey     = `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
-		sheriffBack   = `SOFTWARE\ShieldSheriff\Backup`
-		toastSecKey   = `Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.SecurityAndMaintenance`
-	)
-
-	for _, name := range []string{
-		"DisableRealtimeMonitoring",
-		"DisableBehaviorMonitoring",
-		"DisableIOAVProtection",
-		"DisableScriptScanning",
-		"DisableScanOnRealtimeEnable",
-	} {
-		_ = regDeleteVal(hkeyLocalMachine, polRTP, name)
+	snap, hasSnap, snapErr := loadSnapshot(b)
+	if snapErr != nil {
+		res.Warnings = append(res.Warnings, snapErr.Error())
 	}
-	for _, name := range []string{"SpynetReporting", "SubmitSamplesConsent", "DisableBlockAtFirstSeen"} {
-		_ = regDeleteVal(hkeyLocalMachine, polSpynet, name)
-	}
-	_ = regDeleteVal(hkeyLocalMachine, polNetProt, "EnableNetworkProtection")
-	_ = regDeleteVal(hkeyLocalMachine, polUX, "Notification_Suppress")
-	_ = regDeleteVal(hkeyLocalMachine, polWSCNotif, "DisableNotifications")
-	_ = regDeleteVal(hkeyLocalMachine, polWSCNotif, "DisableEnhancedNotifications")
-	_ = regDeleteVal(hkeyLocalMachine, polWSCSystray, "HideSystray")
-	_ = regWriteDword(hkeyCurrentUser, toastSecKey, "Enabled", 1)
 
-	if _, ok := regReadString(hkeyLocalMachine, winRunKey, "SecurityHealth"); !ok {
-		backupVal, hasBackup := regReadString(hkeyLocalMachine, sheriffBack, "SecurityHealthRun")
-		if !hasBackup || backupVal == "" {
-			backupVal = `%windir%\system32\SecurityHealthSystray.exe`
+	restoredCount := 0
+	for _, spec := range managedRegistryValues {
+		if hasSnap {
+			entry, known := snap.Entries[spec.keyID()]
+			if known {
+				if entry.Exists {
+					var err error
+					if entry.Kind == RegDword || spec.Kind == RegDword {
+						err = b.WriteDword(spec.Root, spec.Subkey, spec.Name, entry.DwordVal)
+					} else {
+						kind := entry.Kind
+						if kind == 0 {
+							kind = spec.Kind
+						}
+						err = b.WriteString(spec.Root, spec.Subkey, spec.Name, entry.StringVal, kind)
+					}
+					if err != nil {
+						res.Success = false
+						res.Warnings = append(res.Warnings, fmt.Sprintf("Restore %s: %v", spec.keyID(), err))
+					} else {
+						restoredCount++
+					}
+					continue
+				}
+				// Value did not exist before ShieldSheriff ran -> delete it
+				if err := b.DeleteValue(spec.Root, spec.Subkey, spec.Name); err != nil {
+					res.Success = false
+					res.Warnings = append(res.Warnings, fmt.Sprintf("Delete %s: %v", spec.keyID(), err))
+				} else {
+					restoredCount++
+				}
+				continue
+			}
 		}
-		_ = regWriteString(hkeyLocalMachine, winRunKey, "SecurityHealth", backupVal, regExpandSz)
+
+		// Fallback when no pre-change snapshot exists: remove policy/live overrides and restore notifications/tray.
+		switch {
+		case spec.Root == HKCU && spec.Subkey == keyToastSec && spec.Name == "Enabled":
+			if err := b.WriteDword(spec.Root, spec.Subkey, spec.Name, 1); err != nil {
+				res.Success = false
+				res.Warnings = append(res.Warnings, err.Error())
+			} else {
+				restoredCount++
+			}
+		case spec.Root == HKLM && spec.Subkey == keyWinRun && spec.Name == "SecurityHealth":
+			if _, _, ok := b.ReadString(HKLM, keyWinRun, "SecurityHealth"); !ok {
+				val := defaultSecurityHealthRun
+				if legacy, _, ok := b.ReadString(HKLM, keyBackup, valLegacyRunBk); ok && legacy != "" {
+					val = legacy
+				}
+				if err := b.WriteString(HKLM, keyWinRun, "SecurityHealth", val, RegExpandSZ); err != nil {
+					res.Success = false
+					res.Warnings = append(res.Warnings, err.Error())
+				} else {
+					restoredCount++
+				}
+			}
+		default:
+			if err := b.DeleteValue(spec.Root, spec.Subkey, spec.Name); err != nil {
+				res.Success = false
+				res.Warnings = append(res.Warnings, err.Error())
+			} else {
+				restoredCount++
+			}
+		}
 	}
 
-	res.Applied = append(res.Applied, "Reverted ShieldSheriff policy overrides (Passive Mode)")
+	// Sync live Defender engine back to the restored/default values so MsMpEng reflects the revert immediately.
+	restoredPolicy := policyFromRestoredState(b)
+	if err := syncWMIPreferences(b, restoredPolicy.RealtimeProtection, restoredPolicy); err != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("WMI revert sync note: %v", err))
+	} else {
+		res.Applied = append(res.Applied, "Synchronized reverted Defender preferences via DCOM Set-MpPreference")
+	}
+
+	if res.Success && hasSnap {
+		_ = b.DeleteValue(HKLM, keyBackup, valBackupSnap)
+	}
+
+	if res.Success {
+		res.Applied = append(res.Applied, fmt.Sprintf("Reverted %d ShieldSheriff registry setting(s) to pre-ShieldSheriff state", restoredCount))
+	}
 	return res
 }
 
+func policyFromRestoredState(b Backend) Policy {
+	st := InspectWith(b, nil, nil)
+	return Policy{
+		RealtimeProtection: st.RealtimeProtection,
+		BehaviorMonitoring: st.BehaviorMonitoring,
+		IOAVProtection:     st.IOAVProtection,
+		ScriptScanning:     st.ScriptScanning,
+		NetworkProtection:  st.NetworkProtection,
+		CloudProtection:    st.CloudProtection,
+		SampleSubmission:   st.SampleSubmission,
+	}
+}
+
 // RunQuickScan triggers an on-demand Quick Scan using Defender's native MpCmdRun.exe.
-// This works even when Real-Time Protection is turned OFF!
 func RunQuickScan() (string, error) {
-	st := Inspect(nil, nil)
+	return RunQuickScanWith(DefaultBackend())
+}
+
+// RunQuickScanWith triggers a Quick Scan using the supplied Backend with a bounded timeout.
+func RunQuickScanWith(b Backend) (string, error) {
+	st := InspectWith(b, nil, nil)
 	if st.MpCmdRunPath == "" {
 		return "", fmt.Errorf("MpCmdRun.exe not found")
 	}
-	cmd := exec.Command(st.MpCmdRunPath, "-Scan", "-ScanType", "1")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	out, err := cmd.CombinedOutput()
-	return strings.TrimSpace(string(out)), err
+	ctx, cancel := context.WithTimeout(context.Background(), quickScanTimeout)
+	defer cancel()
+	return b.RunCommand(ctx, st.MpCmdRunPath, "-Scan", "-ScanType", "1")
 }
 
 // UpdateSignatures triggers an immediate virus definition update via MpCmdRun.exe.
 func UpdateSignatures() (string, error) {
-	st := Inspect(nil, nil)
+	return UpdateSignaturesWith(DefaultBackend())
+}
+
+// UpdateSignaturesWith triggers a definition update using the supplied Backend with a bounded timeout.
+func UpdateSignaturesWith(b Backend) (string, error) {
+	st := InspectWith(b, nil, nil)
 	if st.MpCmdRunPath == "" {
 		return "", fmt.Errorf("MpCmdRun.exe not found")
 	}
-	cmd := exec.Command(st.MpCmdRunPath, "-SignatureUpdate")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	out, err := cmd.CombinedOutput()
-	return strings.TrimSpace(string(out)), err
+	ctx, cancel := context.WithTimeout(context.Background(), sigUpdateTimeout)
+	defer cancel()
+	return b.RunCommand(ctx, st.MpCmdRunPath, "-SignatureUpdate")
 }

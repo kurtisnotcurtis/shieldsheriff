@@ -1,16 +1,20 @@
+//go:build windows
+
 package main
 
 import (
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 var (
-	modUser32Console        = syscall.NewLazyDLL("user32.dll")
-	procGetConsoleWindow    = modKernel32.NewProc("GetConsoleWindow")
-	procGetConsoleProcList  = modKernel32.NewProc("GetConsoleProcessList")
-	procFreeConsole         = modKernel32.NewProc("FreeConsole")
-	procShowWindowConsole   = modUser32Console.NewProc("ShowWindow")
+	modKernel32Console     = windows.NewLazySystemDLL("kernel32.dll")
+	modUser32Console       = windows.NewLazySystemDLL("user32.dll")
+	procGetConsoleWindow   = modKernel32Console.NewProc("GetConsoleWindow")
+	procGetConsoleProcList = modKernel32Console.NewProc("GetConsoleProcessList")
+	procFreeConsole        = modKernel32Console.NewProc("FreeConsole")
+	procShowWindowConsole  = modUser32Console.NewProc("ShowWindow")
 )
 
 const swHide = 0

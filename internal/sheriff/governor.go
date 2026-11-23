@@ -2,160 +2,206 @@ package sheriff
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 
 	"shieldsheriff/internal/defender"
 )
 
-var (
-	modKernel32                  = syscall.NewLazyDLL("kernel32.dll")
-	procCreateToolhelp32Snapshot = modKernel32.NewProc("CreateToolhelp32Snapshot")
-	procProcess32FirstW          = modKernel32.NewProc("Process32FirstW")
-	procProcess32NextW           = modKernel32.NewProc("Process32NextW")
-)
+const maxHealBackoff = 5 * time.Minute
 
-const (
-	th32csSnapProcess = 0x00000002
-	maxPath           = 260
-)
-
-type processEntry32W struct {
-	Size            uint32
-	Usage           uint32
-	ProcessID       uint32
-	DefaultHeapID   uintptr
-	ModuleID        uint32
-	Threads         uint32
-	ParentProcessID uint32
-	PriClassBase    int32
-	Flags           uint32
-	ExeFile         [maxPath]uint16
+// GovernorDeps supplies injectable dependencies for testing without touching the host machine.
+type GovernorDeps struct {
+	Backend            defender.Backend
+	ConfigPath         string
+	FindWatchedProcess func([]string) string
+	IsStartupEnabled   func() bool
+	SetStartup         func(bool) error
+	Now                func() time.Time
 }
 
-// FindRunningWatchedProcess checks running processes via Win32 Toolhelp32 snapshot
-// and returns the first process name from watchList that is currently running.
-func FindRunningWatchedProcess(watchList []string) string {
-	if len(watchList) == 0 {
-		return ""
-	}
-	watchSet := make(map[string]string, len(watchList))
-	for _, w := range watchList {
-		clean := strings.TrimSpace(strings.ToLower(w))
-		if clean != "" {
-			if !strings.HasSuffix(clean, ".exe") {
-				clean += ".exe"
-			}
-			watchSet[clean] = w
-		}
-	}
-	if len(watchSet) == 0 {
-		return ""
-	}
-
-	snap, _, _ := procCreateToolhelp32Snapshot.Call(th32csSnapProcess, 0)
-	if snap == 0 || snap == ^uintptr(0) {
-		return ""
-	}
-	defer syscall.CloseHandle(syscall.Handle(snap))
-
-	var entry processEntry32W
-	entry.Size = uint32(unsafe.Sizeof(entry))
-	r1, _, _ := procProcess32FirstW.Call(snap, uintptr(unsafe.Pointer(&entry)))
-	if r1 == 0 {
-		return ""
-	}
-	for {
-		exeName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
-		if orig, ok := watchSet[exeName]; ok {
-			return orig
-		}
-		entry.Size = uint32(unsafe.Sizeof(entry))
-		r1, _, _ = procProcess32NextW.Call(snap, uintptr(unsafe.Pointer(&entry)))
-		if r1 == 0 {
-			break
-		}
-	}
-	return ""
-}
-
-// Governor coordinates StandingOrders, live DeputyStatus inspection, drift auto-healing,
-// and temporary Stand-Down timers/process watches.
+// Governor coordinates Config (Mode, Policy, Preferences, Pause), live Defender Status inspection,
+// drift auto-healing, and timed/process-based pause lifecycle.
 type Governor struct {
-	mu             sync.RWMutex
-	orders         defender.StandingOrders
-	configPath     string
-	firstRun       bool
-	standDown      defender.StandDownState
-	lastStatus     defender.DeputyStatus
-	lastDriftCheck time.Time
-	updateInfo     UpdateInfo
-	auditLog       []AuditEntry
-	onStateSync    func(defender.DeputyStatus, defender.StandingOrders, defender.StandDownState)
-	stopCh         chan struct{}
+	mu                      sync.RWMutex
+	backend                 defender.Backend
+	findWatchedProcess      func([]string) string
+	isStartupEnabled        func() bool
+	setStartup              func(bool) error
+	nowFn                   func() time.Time
+	config                  Config
+	configPath              string
+	configModTime           time.Time
+	configError             string
+	lastStatus              defender.Status
+	lastDriftCheck          time.Time
+	consecutiveHealFailures int
+	nextHealRetryAt         time.Time
+	updateInfo              UpdateInfo
+	auditLog                []AuditEntry
+	onStateSync             func(defender.Status, Config)
+	stopCh                  chan struct{}
 }
 
-// NewGovernor creates and initializes a Governor instance.
+// NewGovernor creates and initializes a Governor backed by the live Windows host.
 func NewGovernor() *Governor {
-	orders, path, err := LoadOrders()
-	firstRun := false
-	if err != nil {
-		firstRun = true
-		orders.Elected = false
+	return NewGovernorWithDeps(GovernorDeps{})
+}
+
+// NewGovernorWithDeps creates a Governor using custom dependencies (useful for isolated tests).
+func NewGovernorWithDeps(deps GovernorDeps) *Governor {
+	if deps.Backend == nil {
+		deps.Backend = defender.DefaultBackend()
 	}
-	if orders.DriftCheckSeconds <= 0 {
-		orders.DriftCheckSeconds = 15
+	if deps.ConfigPath == "" {
+		deps.ConfigPath = ConfigPath()
 	}
+	if deps.FindWatchedProcess == nil {
+		deps.FindWatchedProcess = FindRunningWatchedProcess
+	}
+	if deps.IsStartupEnabled == nil {
+		deps.IsStartupEnabled = IsTrayStartupEnabled
+	}
+	if deps.SetStartup == nil {
+		deps.SetStartup = SetTrayStartup
+	}
+	if deps.Now == nil {
+		deps.Now = time.Now
+	}
+
 	g := &Governor{
-		orders:     orders,
-		configPath: path,
-		firstRun:   firstRun,
-		stopCh:     make(chan struct{}),
+		backend:            deps.Backend,
+		findWatchedProcess: deps.FindWatchedProcess,
+		isStartupEnabled:   deps.IsStartupEnabled,
+		setStartup:         deps.SetStartup,
+		nowFn:              deps.Now,
+		configPath:         deps.ConfigPath,
+		stopCh:             make(chan struct{}),
 	}
-	if firstRun {
-		g.addAuditLocked("INIT", "First run detected; awaiting user selection before modifying Defender")
-	} else {
-		g.addAuditLocked("INIT", fmt.Sprintf("Loaded configuration (%s) from %s", orders.PresetName, path))
-	}
-	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
-	if firstRun {
-		g.orders = defender.StandingOrders{
-			UpdatedAt:             time.Now(),
-			PresetName:            "unconfigured",
-			Elected:               false,
-			EnforceLoop:           false,
-			DriftCheckSeconds:     15,
-			StartupEnabled:        IsTrayStartupEnabled(),
-			CheckUpdatesOnStart:   false,
-			RealtimeProtection:    g.lastStatus.RealtimeProtection,
-			BehaviorMonitoring:    g.lastStatus.BehaviorMonitoring,
-			IOAVProtection:        g.lastStatus.IOAVProtection,
-			ScriptScanning:        g.lastStatus.ScriptScanning,
-			NetworkProtection:     g.lastStatus.NetworkProtection,
-			CloudProtection:       g.lastStatus.CloudProtection,
-			SampleSubmission:      g.lastStatus.SampleSubmission,
-			SuppressAllNags:       g.lastStatus.NagsSuppressed,
-			SuppressEnhancedNags:  g.lastStatus.EnhancedNagsSuppressed,
-			MuteWindowsSecSystray: g.lastStatus.SecurityTrayIconMuted,
+
+	cfg, err := LoadConfigFrom(g.configPath)
+	switch {
+	case err == nil:
+		g.config = cfg
+		g.recordConfigModTimeLocked()
+		g.addAuditLocked("INIT", fmt.Sprintf("Loaded configuration (mode=%s, preset=%s) from %s", cfg.Mode, defender.PresetDisplayName(cfg.Policy.PresetID), g.configPath))
+	case isNotExist(err):
+		// Genuine first run: inspect live machine state without modifying Defender.
+		live := defender.InspectWith(g.backend, nil, nil)
+		g.config = Config{
+			SchemaVersion: ConfigSchemaVersion,
+			UpdatedAt:     g.nowFn(),
+			Mode:          defender.ModeUnconfigured,
+			Policy: defender.Policy{
+				PresetID:              "",
+				RealtimeProtection:    live.RealtimeProtection,
+				BehaviorMonitoring:    live.BehaviorMonitoring,
+				IOAVProtection:        live.IOAVProtection,
+				ScriptScanning:        live.ScriptScanning,
+				NetworkProtection:     live.NetworkProtection,
+				CloudProtection:       live.CloudProtection,
+				SampleSubmission:      live.SampleSubmission,
+				SuppressAllNags:       live.NagsSuppressed,
+				SuppressEnhancedNags:  live.EnhancedNagsSuppressed,
+				MuteWindowsSecSystray: live.SecurityTrayIconMuted,
+				AutoPauseProcesses:    []string{},
+			},
+			Preferences: defender.Preferences{
+				AutoHeal:            false,
+				DriftCheckSeconds:   15,
+				StartupEnabled:      g.isStartupEnabled(),
+				CheckUpdatesOnStart: false,
+			},
 		}
-		g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
+		g.addAuditLocked("INIT", "First run detected; awaiting user selection before modifying Defender")
+	default:
+		// Corrupt or unreadable config: do NOT silently treat as first-run or overwrite.
+		g.configError = err.Error()
+		g.config = DefaultConfig()
+		g.config.Mode = defender.ModePassive
+		g.config.Preferences.AutoHeal = false
+		g.addAuditLocked("WARN", fmt.Sprintf("Config error (enforcement halted to protect existing file): %v", err))
 	}
+
+	g.lastStatus = g.inspectLocked()
 	return g
 }
 
-// IsFirstRun reports whether ShieldSheriff is awaiting initial user setup/consent.
-func (g *Governor) IsFirstRun() bool {
+func (g *Governor) recordConfigModTimeLocked() {
+	if fi, err := os.Stat(g.configPath); err == nil {
+		g.configModTime = fi.ModTime()
+	}
+}
+
+func (g *Governor) reloadIfChangedOnDiskLocked() bool {
+	fi, err := os.Stat(g.configPath)
+	if err != nil {
+		return false
+	}
+	if !g.configModTime.IsZero() && !fi.ModTime().After(g.configModTime) {
+		return false
+	}
+	cfg, err := LoadConfigFrom(g.configPath)
+	if err != nil {
+		g.configError = err.Error()
+		g.addAuditLocked("WARN", fmt.Sprintf("Skipped reloading modified config (%v)", err))
+		g.configModTime = fi.ModTime()
+		return false
+	}
+	g.config = cfg
+	g.configError = ""
+	g.configModTime = fi.ModTime()
+	g.consecutiveHealFailures = 0
+	g.nextHealRetryAt = time.Time{}
+	g.addAuditLocked("INIT", fmt.Sprintf("Reloaded updated configuration from disk (mode=%s, preset=%s)", cfg.Mode, defender.PresetDisplayName(cfg.Policy.PresetID)))
+	return true
+}
+
+func (g *Governor) inspectLocked() defender.Status {
+	if g.config.Mode == defender.ModeActive {
+		p := g.config.Policy
+		sd := g.config.Pause
+		return defender.InspectWith(g.backend, &p, &sd)
+	}
+	return defender.InspectWith(g.backend, nil, nil)
+}
+
+func (g *Governor) saveLocked() error {
+	g.config.UpdatedAt = g.nowFn()
+	err := SaveConfigTo(g.configPath, g.config)
+	if err == nil {
+		g.configError = ""
+		g.recordConfigModTimeLocked()
+	}
+	return err
+}
+
+// Mode returns the current governance mode (unconfigured, active, or passive).
+func (g *Governor) Mode() defender.Mode {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return g.firstRun || !g.orders.Elected
+	return g.config.Mode
+}
+
+// IsUnconfigured reports whether ShieldSheriff has never been configured yet.
+func (g *Governor) IsUnconfigured() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.config.Mode == defender.ModeUnconfigured
+}
+
+// ConfigError returns any config read/parse error encountered on load or reload.
+func (g *Governor) ConfigError() string {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.configError
 }
 
 func (g *Governor) addAuditLocked(category, msg string) {
 	entry := AuditEntry{
-		Timestamp: time.Now(),
+		Timestamp: g.nowFn(),
 		Category:  category,
 		Message:   msg,
 	}
@@ -165,88 +211,135 @@ func (g *Governor) addAuditLocked(category, msg string) {
 	}
 }
 
-// SetOnStateSync registers a callback invoked whenever state changes (e.g., to update the System Tray icon).
-func (g *Governor) SetOnStateSync(fn func(defender.DeputyStatus, defender.StandingOrders, defender.StandDownState)) {
+// SetOnStateSync registers a callback invoked whenever state mutates (e.g. to refresh the System Tray icon).
+func (g *Governor) SetOnStateSync(fn func(defender.Status, Config)) {
 	g.mu.Lock()
 	g.onStateSync = fn
 	g.mu.Unlock()
 }
 
-// Snapshot returns a thread-safe copy of the current status, orders, stand-down state, and audit log.
-func (g *Governor) Snapshot() (defender.DeputyStatus, defender.StandingOrders, defender.StandDownState, []AuditEntry, string) {
-	g.mu.Lock()
-	st := defender.Inspect(&g.orders, &g.standDown)
-	st, healed := g.healDriftLocked(st)
-	g.lastStatus = st
+// Snapshot returns a pure, read-only snapshot of live Defender status, current Config, audit log, and config path.
+// It NEVER modifies Defender, never heals drift, and never triggers onStateSync.
+func (g *Governor) Snapshot() (defender.Status, Config, []AuditEntry, string) {
+	g.mu.RLock()
+	cfg := g.config.Clone()
 	logs := make([]AuditEntry, len(g.auditLog))
 	copy(logs, g.auditLog)
-	ord := g.orders
-	sd := g.standDown
-	cfg := g.configPath
-	cb := g.onStateSync
-	g.mu.Unlock()
+	cfgPath := g.configPath
+	backend := g.backend
+	g.mu.RUnlock()
 
-	if healed && cb != nil {
-		cb(st, ord, sd)
+	var st defender.Status
+	if cfg.Mode == defender.ModeActive {
+		p := cfg.Policy
+		sd := cfg.Pause
+		st = defender.InspectWith(backend, &p, &sd)
+	} else {
+		st = defender.InspectWith(backend, nil, nil)
 	}
-	return st, ord, sd, logs, cfg
+	return st, cfg, logs, cfgPath
 }
 
-func (g *Governor) healDriftLocked(st defender.DeputyStatus) (defender.DeputyStatus, bool) {
-	if g.orders.Elected && g.orders.EnforceLoop && !st.InCompliance && st.IsElevated && !st.TamperProtectionActive {
-		res := defender.Enforce(g.orders, &g.standDown)
-		if res.Success {
-			g.addAuditLocked("DRIFT", fmt.Sprintf("Auto-healed configuration drift (%s)", strings.Join(st.DriftItems, ", ")))
-			return defender.Inspect(&g.orders, &g.standDown), true
-		}
+// UpdateConfig validates, saves, and (when mode == ModeActive) enforces the provided Policy and Preferences.
+func (g *Governor) UpdateConfig(mode defender.Mode, policy defender.Policy, prefs defender.Preferences) (defender.EnforceResult, error) {
+	if !mode.Valid() {
+		return defender.EnforceResult{Success: false, Warnings: []string{fmt.Sprintf("invalid mode %q", mode)}}, fmt.Errorf("invalid mode %q", mode)
 	}
-	return st, false
-}
+	if err := policy.Validate(); err != nil {
+		return defender.EnforceResult{Success: false, Warnings: []string{err.Error()}}, err
+	}
+	prefs.Normalize()
 
-// UpdateOrders saves and enforces new StandingOrders.
-func (g *Governor) UpdateOrders(orders defender.StandingOrders) (defender.EnforceResult, error) {
 	g.mu.Lock()
-	if orders.DriftCheckSeconds <= 0 {
-		orders.DriftCheckSeconds = 15
+	prevStartup := g.config.Preferences.StartupEnabled
+	g.config.Mode = mode
+	g.config.Policy = policy.Clone()
+	g.config.Preferences = prefs
+	if mode != defender.ModeActive {
+		g.config.Pause = defender.PauseState{}
 	}
-	prevStartup := g.orders.StartupEnabled
-	orders.Elected = true
-	g.firstRun = false
-	g.orders = orders
-	path, saveErr := SaveOrders(g.orders)
-	g.configPath = path
-	res := defender.Enforce(g.orders, &g.standDown)
-	if defender.IsProcessElevated() && orders.StartupEnabled != prevStartup {
-		if err := SetTrayStartup(orders.StartupEnabled); err != nil {
+	g.consecutiveHealFailures = 0
+	g.nextHealRetryAt = time.Time{}
+
+	saveErr := g.saveLocked()
+
+	var res defender.EnforceResult
+	if mode == defender.ModeActive {
+		res = defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+	} else {
+		res = defender.EnforceResult{Success: true}
+	}
+
+	if g.backend.IsElevated() && prefs.StartupEnabled != prevStartup {
+		if err := g.setStartup(prefs.StartupEnabled); err != nil {
 			res.Warnings = append(res.Warnings, err.Error())
-		} else if orders.StartupEnabled {
+		} else if prefs.StartupEnabled {
 			g.addAuditLocked("STARTUP", "Enabled ShieldSheriff tray launch at Windows logon")
 		} else {
 			g.addAuditLocked("STARTUP", "Disabled ShieldSheriff tray launch at Windows logon")
 		}
 	}
-	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
-	if res.Success {
-		g.addAuditLocked("APPLY", fmt.Sprintf("Applied configuration (%s): %d policies enforced", orders.PresetName, len(res.Applied)))
-	} else if len(res.Warnings) > 0 {
-		g.addAuditLocked("WARN", fmt.Sprintf("Saved configuration (%s); enforcement pending elevation: %s", orders.PresetName, res.Warnings[0]))
+
+	g.lastStatus = g.inspectLocked()
+	label := defender.PresetDisplayName(policy.PresetID)
+	if mode == defender.ModeActive {
+		if res.Success {
+			g.addAuditLocked("APPLY", fmt.Sprintf("Applied configuration (%s): %d rules applied", label, len(res.Applied)))
+		} else if len(res.Warnings) > 0 {
+			g.addAuditLocked("WARN", fmt.Sprintf("Saved configuration (%s); enforcement warning: %s", label, res.Warnings[0]))
+		}
 	}
+
 	cb := g.onStateSync
 	st := g.lastStatus
-	sd := g.standDown
+	cfg := g.config.Clone()
 	g.mu.Unlock()
 
 	if cb != nil {
-		cb(st, orders, sd)
+		cb(st, cfg)
 	}
 	return res, saveErr
 }
 
-// EnforceNow forces an immediate enforcement pass of the current StandingOrders.
+// ApplyPreset switches Defender Policy to the named built-in preset while preserving
+// all user app Preferences (StartupEnabled, AutoHeal, DriftCheckSeconds, CheckUpdatesOnStart).
+func (g *Governor) ApplyPreset(presetID string) (defender.EnforceResult, error) {
+	preset, ok := defender.FindPreset(presetID)
+	if !ok {
+		err := fmt.Errorf("unknown preset %q (available: %s)", presetID, strings.Join(defender.PresetIDs(), ", "))
+		return defender.EnforceResult{Success: false, Warnings: []string{err.Error()}}, err
+	}
+
+	g.mu.RLock()
+	prefs := g.config.Preferences
+	wasUnconfigured := g.config.Mode == defender.ModeUnconfigured
+	g.mu.RUnlock()
+
+	if wasUnconfigured {
+		// When moving from first-run directly via preset, enable AutoHeal by default.
+		prefs.AutoHeal = true
+	}
+	prefs.Normalize()
+
+	g.mu.Lock()
+	g.config.Pause = defender.PauseState{}
+	g.mu.Unlock()
+
+	return g.UpdateConfig(defender.ModeActive, preset.Policy, prefs)
+}
+
+// EnforceNow forces an immediate enforcement pass if and only if Mode == ModeActive.
 func (g *Governor) EnforceNow() defender.EnforceResult {
 	g.mu.Lock()
-	res := defender.Enforce(g.orders, &g.standDown)
-	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
+	if g.config.Mode != defender.ModeActive {
+		g.mu.Unlock()
+		return defender.EnforceResult{
+			Success:  false,
+			Warnings: []string{"ShieldSheriff is not active (Passive / Unconfigured mode); apply a configuration first"},
+		}
+	}
+	res := defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+	g.lastStatus = g.inspectLocked()
 	if res.Success {
 		g.addAuditLocked("ENFORCE", fmt.Sprintf("Enforced configuration (%d rules applied)", len(res.Applied)))
 	} else if len(res.Warnings) > 0 {
@@ -254,83 +347,117 @@ func (g *Governor) EnforceNow() defender.EnforceResult {
 	}
 	cb := g.onStateSync
 	st := g.lastStatus
-	ord := g.orders
-	sd := g.standDown
+	cfg := g.config.Clone()
 	g.mu.Unlock()
 
 	if cb != nil {
-		cb(st, ord, sd)
+		cb(st, cfg)
 	}
 	return res
 }
 
-// EnterPassiveMode stops enforcing policies and reverts ShieldSheriff's policy overrides.
-func (g *Governor) EnterPassiveMode() defender.EnforceResult {
+// EnterPassiveMode stops enforcing policies, persists ModePassive, and reverts all ShieldSheriff
+// Defender & Security Center registry changes back to their pre-ShieldSheriff snapshot.
+func (g *Governor) EnterPassiveMode() (defender.EnforceResult, error) {
 	g.mu.Lock()
-	g.standDown = defender.StandDownState{}
-	g.orders.Elected = false
-	g.orders.PresetName = "passive"
-	_, _ = SaveOrders(g.orders)
-	res := defender.RevertPolicies()
-	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
-	g.addAuditLocked("PASSIVE", "Entered Passive Mode (reverted policy overrides; passthrough)")
+	g.config.Pause = defender.PauseState{}
+	g.config.Mode = defender.ModePassive
+	g.consecutiveHealFailures = 0
+	g.nextHealRetryAt = time.Time{}
+
+	saveErr := g.saveLocked()
+	res := defender.RevertPoliciesWith(g.backend)
+	g.lastStatus = g.inspectLocked()
+
+	if res.Success {
+		g.addAuditLocked("PASSIVE", "Entered Passive Mode (reverted ShieldSheriff settings to pre-change state)")
+	} else if len(res.Warnings) > 0 {
+		g.addAuditLocked("WARN", fmt.Sprintf("Passive Mode revert reported issues: %s", res.Warnings[0]))
+	}
+
 	cb := g.onStateSync
 	st := g.lastStatus
-	ord := g.orders
-	sd := g.standDown
+	cfg := g.config.Clone()
 	g.mu.Unlock()
 
 	if cb != nil {
-		cb(st, ord, sd)
+		cb(st, cfg)
 	}
-	return res
+	return res, saveErr
 }
 
-// StartStandDown pauses Real-Time Protection for the specified duration.
-func (g *Governor) StartStandDown(duration time.Duration, reason string) defender.EnforceResult {
+// StartPause pauses Real-Time Protection for the specified duration.
+// Refuses to modify Defender when ShieldSheriff is not in ModeActive.
+func (g *Governor) StartPause(duration time.Duration, reason string) (defender.EnforceResult, error) {
+	if duration <= 0 {
+		err := fmt.Errorf("pause duration must be positive")
+		return defender.EnforceResult{Success: false, Warnings: []string{err.Error()}}, err
+	}
+
 	g.mu.Lock()
-	now := time.Now()
-	g.standDown = defender.StandDownState{
+	if g.config.Mode != defender.ModeActive {
+		g.mu.Unlock()
+		msg := "Cannot pause: ShieldSheriff is in Passive / Unconfigured mode (apply a configuration first)"
+		return defender.EnforceResult{Success: false, Warnings: []string{msg}}, fmt.Errorf("%s", msg)
+	}
+
+	now := g.nowFn()
+	g.config.Pause = defender.PauseState{
 		Active:    true,
 		Reason:    reason,
 		StartedAt: now,
 		ExpiresAt: now.Add(duration),
 	}
-	res := defender.Enforce(g.orders, &g.standDown)
-	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
-	g.addAuditLocked("PAUSE", fmt.Sprintf("Protection paused for %s (%s)", duration.Round(time.Second), reason))
+	saveErr := g.saveLocked()
+	res := defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+	g.lastStatus = g.inspectLocked()
+	if res.Success {
+		g.addAuditLocked("PAUSE", fmt.Sprintf("Protection paused for %s (%s)", duration.Round(time.Second), reason))
+	} else if len(res.Warnings) > 0 {
+		g.addAuditLocked("WARN", fmt.Sprintf("Pause requested (%s) with warning: %s", reason, res.Warnings[0]))
+	}
 	cb := g.onStateSync
 	st := g.lastStatus
-	ord := g.orders
-	sd := g.standDown
+	cfg := g.config.Clone()
 	g.mu.Unlock()
 
 	if cb != nil {
-		cb(st, ord, sd)
+		cb(st, cfg)
 	}
-	return res
+	return res, saveErr
 }
 
-// ResumeFromStandDown cancels any active Stand-Down and immediately restores StandingOrders.
-func (g *Governor) ResumeFromStandDown() defender.EnforceResult {
+// ResumePause cancels any active pause and immediately restores the active Policy.
+// Refuses to modify Defender when ShieldSheriff is not in ModeActive.
+func (g *Governor) ResumePause() (defender.EnforceResult, error) {
 	g.mu.Lock()
-	g.standDown = defender.StandDownState{}
-	res := defender.Enforce(g.orders, &g.standDown)
-	g.lastStatus = defender.Inspect(&g.orders, &g.standDown)
-	g.addAuditLocked("PAUSE", "Protection resumed")
+	if g.config.Mode != defender.ModeActive {
+		g.mu.Unlock()
+		msg := "Cannot resume: ShieldSheriff is in Passive / Unconfigured mode"
+		return defender.EnforceResult{Success: false, Warnings: []string{msg}}, fmt.Errorf("%s", msg)
+	}
+
+	g.config.Pause = defender.PauseState{}
+	saveErr := g.saveLocked()
+	res := defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+	g.lastStatus = g.inspectLocked()
+	if res.Success {
+		g.addAuditLocked("PAUSE", "Protection resumed")
+	} else if len(res.Warnings) > 0 {
+		g.addAuditLocked("WARN", fmt.Sprintf("Resume warning: %s", res.Warnings[0]))
+	}
 	cb := g.onStateSync
 	st := g.lastStatus
-	ord := g.orders
-	sd := g.standDown
+	cfg := g.config.Clone()
 	g.mu.Unlock()
 
 	if cb != nil {
-		cb(st, ord, sd)
+		cb(st, cfg)
 	}
-	return res
+	return res, saveErr
 }
 
-// StartLoop starts the background drift-watcher and process/timer Stand-Down loop.
+// StartLoop starts the background drift-watcher and pause timer/process-watch loop.
 func (g *Governor) StartLoop() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -340,10 +467,19 @@ func (g *Governor) StartLoop() {
 			case <-g.stopCh:
 				return
 			case <-ticker.C:
-				g.tick()
+				g.Tick()
 			}
 		}
 	}()
+}
+
+// StopLoop stops the background watcher loop.
+func (g *Governor) StopLoop() {
+	select {
+	case <-g.stopCh:
+	default:
+		close(g.stopCh)
+	}
 }
 
 // CheckForUpdates queries GitHub for a newer ShieldSheriff release and caches the result.
@@ -368,74 +504,125 @@ func (g *Governor) GetUpdateInfo() UpdateInfo {
 	defer g.mu.RUnlock()
 	return g.updateInfo
 }
-// StopLoop stops the background watcher loop.
-func (g *Governor) StopLoop() {
-	select {
-	case <-g.stopCh:
-	default:
-		close(g.stopCh)
-	}
-}
 
-func (g *Governor) tick() {
+// Tick runs a single governance cycle: reloads external config changes, enforces active pause
+// timers/process watches, and heals drift at the configured interval with failure backoff.
+func (g *Governor) Tick() {
 	g.mu.Lock()
-	now := time.Now()
+	now := g.nowFn()
 	stateChanged := false
 
-	// 1. Check timed Pause expiration
-	if g.standDown.Active && !g.standDown.ExpiresAt.IsZero() && now.After(g.standDown.ExpiresAt) {
-		g.standDown = defender.StandDownState{}
-		_ = defender.Enforce(g.orders, &g.standDown)
-		g.addAuditLocked("PAUSE", "Pause timer expired; restored configuration")
+	// 0. Reload config.json if another elevated process (e.g. CLI) updated it.
+	if g.reloadIfChangedOnDiskLocked() {
 		stateChanged = true
 	}
 
-	// 2. Check AutoStandDownProcesses
-	if len(g.orders.AutoStandDownProcesses) > 0 {
-		matched := FindRunningWatchedProcess(g.orders.AutoStandDownProcesses)
-		if matched != "" && !g.standDown.Active {
-			g.standDown = defender.StandDownState{
+	// Gate ALL enforcement, auto-pause, and drift healing strictly on ModeActive.
+	if g.config.Mode != defender.ModeActive {
+		g.lastStatus = g.inspectLocked()
+		cb := g.onStateSync
+		st := g.lastStatus
+		cfg := g.config.Clone()
+		g.mu.Unlock()
+		if stateChanged && cb != nil {
+			cb(st, cfg)
+		}
+		return
+	}
+
+	// 1. Check timed Pause expiration
+	if g.config.Pause.Active && !g.config.Pause.ExpiresAt.IsZero() && now.After(g.config.Pause.ExpiresAt) {
+		g.config.Pause = defender.PauseState{}
+		_ = g.saveLocked()
+		res := defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+		if res.Success {
+			g.addAuditLocked("PAUSE", "Pause timer expired; restored configuration")
+		} else if len(res.Warnings) > 0 {
+			g.addAuditLocked("WARN", fmt.Sprintf("Pause timer expired, restore warning: %s", res.Warnings[0]))
+		}
+		stateChanged = true
+	}
+
+	// 2. Check AutoPauseProcesses
+	if len(g.config.Policy.AutoPauseProcesses) > 0 {
+		matched := g.findWatchedProcess(g.config.Policy.AutoPauseProcesses)
+		if matched != "" && !g.config.Pause.Active {
+			g.config.Pause = defender.PauseState{
 				Active:         true,
 				Reason:         "Watched process running: " + matched,
 				StartedAt:      now,
 				MatchedProcess: matched,
 			}
-			_ = defender.Enforce(g.orders, &g.standDown)
-			g.addAuditLocked("PAUSE", fmt.Sprintf("Auto-pause triggered by %s", matched))
+			_ = g.saveLocked()
+			res := defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+			if res.Success {
+				g.addAuditLocked("PAUSE", fmt.Sprintf("Auto-pause triggered by %s", matched))
+			} else if len(res.Warnings) > 0 {
+				g.addAuditLocked("WARN", fmt.Sprintf("Auto-pause (%s) warning: %s", matched, res.Warnings[0]))
+			}
 			stateChanged = true
-		} else if matched == "" && g.standDown.Active && g.standDown.MatchedProcess != "" && g.standDown.ExpiresAt.IsZero() {
-			prevProc := g.standDown.MatchedProcess
-			g.standDown = defender.StandDownState{}
-			_ = defender.Enforce(g.orders, &g.standDown)
-			g.addAuditLocked("PAUSE", fmt.Sprintf("Watched process %s exited; restored Real-Time Protection", prevProc))
+		} else if matched == "" && g.config.Pause.Active && g.config.Pause.MatchedProcess != "" && g.config.Pause.ExpiresAt.IsZero() {
+			prevProc := g.config.Pause.MatchedProcess
+			g.config.Pause = defender.PauseState{}
+			_ = g.saveLocked()
+			res := defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+			if res.Success {
+				g.addAuditLocked("PAUSE", fmt.Sprintf("Watched process %s exited; restored Real-Time Protection", prevProc))
+			} else if len(res.Warnings) > 0 {
+				g.addAuditLocked("WARN", fmt.Sprintf("Restore after %s warning: %s", prevProc, res.Warnings[0]))
+			}
 			stateChanged = true
 		}
 	}
 
-	// 3. Inspect live state & heal drift at configured interval if Elected + EnforceLoop + Elevated
-	driftInterval := time.Duration(g.orders.DriftCheckSeconds) * time.Second
+	// 3. Inspect live state & heal drift at configured interval with failure backoff.
+	driftInterval := time.Duration(g.config.Preferences.DriftCheckSeconds) * time.Second
 	if driftInterval < 10*time.Second {
 		driftInterval = 15 * time.Second
 	}
 	st := g.lastStatus
 	prevCompliance := st.InCompliance
-	if now.Sub(g.lastDriftCheck) >= driftInterval {
+	if g.lastDriftCheck.IsZero() || now.Sub(g.lastDriftCheck) >= driftInterval {
 		g.lastDriftCheck = now
-		st = defender.Inspect(&g.orders, &g.standDown)
-		var healed bool
-		st, healed = g.healDriftLocked(st)
-		if healed {
-			stateChanged = true
+		st = g.inspectLocked()
+		if st.InCompliance {
+			g.consecutiveHealFailures = 0
+			g.nextHealRetryAt = time.Time{}
+		} else if g.config.Preferences.AutoHeal && st.IsElevated && !st.TamperProtectionActive {
+			if g.nextHealRetryAt.IsZero() || !now.Before(g.nextHealRetryAt) {
+				driftSummary := strings.Join(st.DriftItems, ", ")
+				res := defender.EnforceWith(g.backend, g.config.Policy, &g.config.Pause)
+				post := g.inspectLocked()
+				if res.Success && post.InCompliance {
+					g.consecutiveHealFailures = 0
+					g.nextHealRetryAt = time.Time{}
+					g.addAuditLocked("DRIFT", fmt.Sprintf("Auto-healed configuration drift (%s)", driftSummary))
+					st = post
+					stateChanged = true
+				} else {
+					g.consecutiveHealFailures++
+					backoff := 30 * time.Second << min(g.consecutiveHealFailures-1, 4)
+					if backoff > maxHealBackoff {
+						backoff = maxHealBackoff
+					}
+					g.nextHealRetryAt = now.Add(backoff)
+					reason := "drift persisted after enforce"
+					if len(res.Warnings) > 0 {
+						reason = res.Warnings[0]
+					}
+					g.addAuditLocked("WARN", fmt.Sprintf("Auto-heal failed (%s); backing off for %s", reason, backoff))
+					st = post
+				}
+			}
 		}
 		g.lastStatus = st
 	}
 
 	cb := g.onStateSync
-	ord := g.orders
-	sd := g.standDown
+	cfg := g.config.Clone()
 	g.mu.Unlock()
 
 	if (stateChanged || prevCompliance != st.InCompliance) && cb != nil {
-		cb(st, ord, sd)
+		cb(st, cfg)
 	}
 }

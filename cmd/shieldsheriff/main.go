@@ -1,4 +1,6 @@
-//go:generate go run github.com/tc-hib/go-winres@latest make --in winres/winres.json --out rsrc --arch amd64,arm64
+//go:build windows
+
+//go:generate go run github.com/tc-hib/go-winres@v0.3.3 make --in winres/winres.json --out rsrc --arch amd64,arm64
 
 package main
 
@@ -25,8 +27,8 @@ func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
 		runStatus(nil)
-		fmt.Println("  Launch UI / Tray : shieldsheriff ui [--elevate]  |  shieldsheriff tray [--elevate]")
-		fmt.Println("  All Commands     : shieldsheriff help")
+		fmt.Println("  Launch UI / Tray : shiesh ui [--elevate]  |  shiesh tray [--elevate]")
+		fmt.Println("  All Commands     : shiesh help")
 		return
 	}
 
@@ -45,13 +47,13 @@ func main() {
 	case "pause":
 		runPause(args[1:])
 	case "resume":
-		runResume()
+		runResume(args[1:])
+	case "passive":
+		runPassive(args[1:])
 	case "scan":
 		runScan()
 	case "update":
 		runUpdate()
-	case "service":
-		runService(args[1:])
 	case "version", "-v", "--version":
 		runVersion(args[1:])
 	case "help", "-h", "--help":
@@ -89,10 +91,24 @@ func hasFlag(args []string, flag string) bool {
 	return false
 }
 
+// stripElevateFlags removes --elevate / -e from args and reports whether elevation was requested.
+func stripElevateFlags(args []string) ([]string, bool) {
+	want := false
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		if strings.EqualFold(a, "--elevate") || strings.EqualFold(a, "-e") {
+			want = true
+			continue
+		}
+		out = append(out, a)
+	}
+	return out, want
+}
+
 func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bool) {
 	suppressOwnedConsoleWindow()
 
-	const instanceMutexName = `Local\ShieldSheriffCommandCenterInstance`
+	const instanceMutexName = `Local\ShieldSheriffInstance`
 	const preferredPort = 38419
 
 	var (
@@ -100,22 +116,24 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bo
 		alreadyRunning bool
 		err            error
 	)
-	attempts := 1
+	deadline := time.Now()
 	if replaceExisting {
-		attempts = 20
+		deadline = deadline.Add(5 * time.Second)
 	}
-	for i := 0; i < attempts; i++ {
+	for {
 		release, alreadyRunning, err = acquireSingleInstance(instanceMutexName)
-		if err != nil || !alreadyRunning {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Single-instance mutex error: %v\n", err)
+			os.Exit(1)
+		}
+		if !alreadyRunning || !replaceExisting || time.Now().After(deadline) {
 			break
 		}
-		if replaceExisting && i < attempts-1 {
-			time.Sleep(150 * time.Millisecond)
-		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	if err == nil && alreadyRunning {
+	if alreadyRunning {
 		if openWindowOnStart {
-			_ = focusExistingInstance(preferredPort)
+			_ = focusExistingInstance()
 		}
 		fmt.Println("ShieldSheriff is already running.")
 		return
@@ -135,17 +153,17 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bo
 	}
 
 	gov := sheriff.NewGovernor()
-	st, ord, _, _, _ := gov.Snapshot()
+	st, cfg, _, _ := gov.Snapshot()
 	if !st.IsElevated {
 		if !openWindowOnStart {
-			fmt.Fprintln(os.Stderr, "System Tray mode requires Administrator privileges. Run `shieldsheriff tray --elevate` (or launch from an elevated shell).")
+			fmt.Fprintln(os.Stderr, "System Tray mode requires Administrator privileges. Run `shiesh tray --elevate` (or launch from an elevated shell).")
 			os.Exit(1)
 		}
 		runReadOnlyUI(gov, preferredPort)
 		return
 	}
 
-	if ord.Elected && !st.TamperProtectionActive {
+	if cfg.Mode == defender.ModeActive && !st.TamperProtectionActive {
 		gov.EnforceNow()
 	}
 	gov.StartLoop()
@@ -156,22 +174,19 @@ func runInteractive(openWindowOnStart bool, replaceExisting bool, wantElevate bo
 		fmt.Fprintf(os.Stderr, "Failed to start Dashboard UI server: %v\n", err)
 		os.Exit(1)
 	}
+	srv.PublishRuntimeEndpoints()
 
 	fmt.Printf("ShieldSheriff Dashboard running at %s\n", srv.URL())
 	if openWindowOnStart {
-		go func() {
-			time.Sleep(250 * time.Millisecond)
-			srv.OpenWindow()
-		}()
+		srv.OpenWindow()
 	}
 
 	appTray := tray.NewAppTray(gov, func() {
 		srv.OpenWindow()
 	})
-	appTray.SetServerURL(srv.URL())
 	srv.SetOnShutdown(appTray.Quit)
 
-	if ord.Elected && ord.CheckUpdatesOnStart {
+	if cfg.Mode == defender.ModeActive && cfg.Preferences.CheckUpdatesOnStart {
 		go func() {
 			info := gov.CheckForUpdates()
 			if info.Available {
@@ -207,6 +222,7 @@ func runReadOnlyUI(gov *sheriff.Governor, preferredPort int) {
 		fmt.Fprintf(os.Stderr, "Failed to start Dashboard UI server: %v\n", err)
 		os.Exit(1)
 	}
+	srv.PublishRuntimeEndpoints()
 
 	doneCh := make(chan struct{})
 	var closeOnce sync.Once
@@ -241,41 +257,45 @@ func runReadOnlyUI(gov *sheriff.Governor, preferredPort int) {
 
 func runStatus(args []string) {
 	gov := sheriff.NewGovernor()
-	st, ord, sd, _, cfgPath := gov.Snapshot()
+	st, cfg, _, cfgPath := gov.Snapshot()
 
 	for _, a := range args {
 		if a == "--json" || a == "-j" {
 			out, _ := json.MarshalIndent(map[string]any{
-				"version":    version.Info(),
-				"status":     st,
-				"orders":     ord,
-				"standDown":  sd,
-				"configPath": cfgPath,
+				"version":     version.Info(),
+				"status":      st,
+				"config":      cfg,
+				"configError": gov.ConfigError(),
+				"configPath":  cfgPath,
 			}, "", "  ")
 			fmt.Println(string(out))
 			return
 		}
 	}
 
+	pol := cfg.Policy
 	fmt.Println("================================================================")
 	fmt.Printf("  SHIELDSHERIFF v%s (%s) - DEFENDER STATUS & CONFIGURATION\n", version.Version, version.Codename)
 	fmt.Println("================================================================")
-	fmt.Printf("  Privilege Level     : %s\n", map[bool]string{true: "Elevated (Administrator / SYSTEM)", false: "Standard User (Read-Only)"}[st.IsElevated])
-	fmt.Printf("  Configuration       : %s (%s)\n", ord.PresetName, cfgPath)
+	fmt.Printf("  Privilege Level     : %s\n", map[bool]string{true: "Elevated (Administrator)", false: "Standard User (Read-Only)"}[st.IsElevated])
+	fmt.Printf("  Mode / Preset       : %s / %s (%s)\n", cfg.Mode, defender.PresetDisplayName(pol.PresetID), cfgPath)
+	if cfgErr := gov.ConfigError(); cfgErr != "" {
+		fmt.Printf("  Config Error        : ! %s\n", cfgErr)
+	}
 	fmt.Printf("  Defender Service    : %s (Platform %s | Signatures %s)\n",
 		map[bool]string{true: "RUNNING", false: "STOPPED"}[st.ServiceRunning],
 		st.PlatformVersion, st.SignatureVersion)
 	fmt.Printf("  Tamper Protection   : %s (raw=0x%x)\n",
 		map[bool]string{true: "ON  [Blocks policy writes - toggle OFF once in Windows Security]", false: "OFF [Ready for ShieldSheriff]"}[st.TamperProtectionActive],
 		st.TamperProtectionRaw)
-	if sd.Active {
-		fmt.Printf("  Pause Status        : ACTIVE (%s)\n", sd.Reason)
+	if cfg.Pause.Active {
+		fmt.Printf("  Pause Status        : ACTIVE (%s)\n", cfg.Pause.Reason)
 	}
 	fmt.Println("----------------------------------------------------------------")
 	fmt.Println("  SETTING                         LIVE STATE          CONFIGURED")
 	fmt.Println("----------------------------------------------------------------")
-	printRow := func(name, live, order string) {
-		fmt.Printf("  %-30s  %-18s  %s\n", name, live, order)
+	printRow := func(name, live, configured string) {
+		fmt.Printf("  %-30s  %-18s  %s\n", name, live, configured)
 	}
 	onOff := func(b bool) string {
 		if b {
@@ -283,17 +303,19 @@ func runStatus(args []string) {
 		}
 		return "OFF"
 	}
-	printRow("Real-Time Protection", onOff(st.RealtimeProtection), onOff(ord.RealtimeProtection))
-	printRow("Behavior Monitoring", onOff(st.BehaviorMonitoring), onOff(ord.BehaviorMonitoring))
-	printRow("Downloaded Files (IOAV)", onOff(st.IOAVProtection), onOff(ord.IOAVProtection))
-	printRow("Script Scanning (AMSI)", onOff(st.ScriptScanning), onOff(ord.ScriptScanning))
-	printRow("Network Protection", fmt.Sprintf("Mode %d", st.NetworkProtection), fmt.Sprintf("Mode %d", ord.NetworkProtection))
-	printRow("Cloud Protection (MAPS)", fmt.Sprintf("Mode %d (%s)", st.CloudProtection, map[bool]string{true: "OFF", false: "ON"}[st.CloudProtection == 0]), fmt.Sprintf("Mode %d", ord.CloudProtection))
-	printRow("Sample Submission", fmt.Sprintf("Mode %d (%s)", st.SampleSubmission, map[bool]string{true: "Never/OFF", false: "Active"}[st.SampleSubmission == 2]), fmt.Sprintf("Mode %d", ord.SampleSubmission))
-	printRow("Security Center Nags", map[bool]string{true: "SILENCED", false: "ACTIVE (Nagging)"}[st.NagsSuppressed], map[bool]string{true: "SILENCED", false: "Allow"}[ord.SuppressAllNags])
-	printRow("Windows Security Tray Icon", map[bool]string{true: "MUTED", false: "VISIBLE"}[st.SecurityTrayIconMuted], map[bool]string{true: "MUTED", false: "VISIBLE"}[ord.MuteWindowsSecSystray])
+	printRow("Real-Time Protection", onOff(st.RealtimeProtection), onOff(pol.RealtimeProtection))
+	printRow("Behavior Monitoring", onOff(st.BehaviorMonitoring), onOff(pol.BehaviorMonitoring))
+	printRow("Downloaded Files (IOAV)", onOff(st.IOAVProtection), onOff(pol.IOAVProtection))
+	printRow("Script Scanning (AMSI)", onOff(st.ScriptScanning), onOff(pol.ScriptScanning))
+	printRow("Network Protection", fmt.Sprintf("Mode %d", st.NetworkProtection), fmt.Sprintf("Mode %d", pol.NetworkProtection))
+	printRow("Cloud Protection (MAPS)", fmt.Sprintf("Mode %d (%s)", st.CloudProtection, map[bool]string{true: "OFF", false: "ON"}[st.CloudProtection == 0]), fmt.Sprintf("Mode %d", pol.CloudProtection))
+	printRow("Sample Submission", fmt.Sprintf("Mode %d (%s)", st.SampleSubmission, map[bool]string{true: "Never/OFF", false: "Active"}[st.SampleSubmission == 2]), fmt.Sprintf("Mode %d", pol.SampleSubmission))
+	printRow("Security Center Nags", map[bool]string{true: "SILENCED", false: "ACTIVE (Nagging)"}[st.NagsSuppressed], map[bool]string{true: "SILENCED", false: "Allow"}[pol.SuppressAllNags])
+	printRow("Windows Security Tray Icon", map[bool]string{true: "MUTED", false: "VISIBLE"}[st.SecurityTrayIconMuted], map[bool]string{true: "MUTED", false: "VISIBLE"}[pol.MuteWindowsSecSystray])
 	fmt.Println("----------------------------------------------------------------")
-	if st.InCompliance {
+	if cfg.Mode != defender.ModeActive {
+		fmt.Printf("  COMPLIANCE: NOT ENFORCING (%s)\n", cfg.Mode)
+	} else if st.InCompliance {
 		fmt.Println("  COMPLIANCE: IN COMPLIANCE")
 	} else {
 		fmt.Printf("  COMPLIANCE: ! %d DRIFT ITEM(S) DETECTED:\n", len(st.DriftItems))
@@ -301,185 +323,378 @@ func runStatus(args []string) {
 			fmt.Printf("    - %s\n", d)
 		}
 		if !st.IsElevated {
-			fmt.Println("\n  Tip: Run `shieldsheriff apply --elevate` to apply configuration as Administrator.")
+			fmt.Println("\n  Tip: Run `shiesh apply --elevate` to apply configuration as Administrator.")
 		}
 	}
 	fmt.Println("================================================================")
 }
 
 func runApply(args []string) {
-	gov := sheriff.NewGovernor()
-	_, ord, _, _, _ := gov.Snapshot()
+	cleanArgs, wantElevate := stripElevateFlags(args)
 
-	wantElevate := false
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--elevate" || a == "-e" {
-			wantElevate = true
-		} else if (a == "--preset" || a == "-p") && i+1 < len(args) {
-			i++
-			presetID := strings.ToLower(args[i])
-			found := false
-			for _, p := range defender.BuiltinPresets() {
-				if p.ID == presetID {
-					ord = p.Orders
-					found = true
-					break
-				}
-			}
-			if !found {
-				fmt.Fprintf(os.Stderr, "Unknown preset %q. Available: cloud-local, local-protection, workstation, on-demand\n", presetID)
+	var presetID string
+	for i := 0; i < len(cleanArgs); i++ {
+		a := cleanArgs[i]
+		if a == "--preset" || a == "-p" {
+			if i+1 >= len(cleanArgs) {
+				fmt.Fprintln(os.Stderr, "Missing value for --preset")
 				os.Exit(1)
 			}
+			i++
+			presetID = strings.ToLower(strings.TrimSpace(cleanArgs[i]))
+			if _, ok := defender.FindPreset(presetID); !ok {
+				fmt.Fprintf(os.Stderr, "Unknown preset %q. Available: %s\n", presetID, strings.Join(defender.PresetIDs(), ", "))
+				os.Exit(1)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Unknown argument %q for apply\n", a)
+			os.Exit(1)
 		}
 	}
 
 	if !defender.IsProcessElevated() && wantElevate {
-		_, _ = sheriff.SaveOrders(ord)
+		forward := append([]string{"apply"}, cleanArgs...)
 		fmt.Println("Requesting Administrator privileges via UAC to apply configuration...")
-		if err := defender.RelaunchElevated([]string{"apply"}); err != nil {
+		if err := defender.RelaunchElevated(forward); err != nil {
 			fmt.Fprintf(os.Stderr, "Elevation failed: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	res, err := gov.UpdateOrders(ord)
+	gov := sheriff.NewGovernor()
+	_, cfg, _, _ := gov.Snapshot()
+
+	targetPolicy := cfg.Policy.Clone()
+	targetPrefs := cfg.Preferences
+	if presetID != "" {
+		p, _ := defender.FindPreset(presetID)
+		targetPolicy = p.Policy
+		if cfg.Mode == defender.ModeUnconfigured {
+			targetPrefs.AutoHeal = true
+		}
+	} else if cfg.Mode == defender.ModeUnconfigured {
+		// Bare `shiesh apply` on an unconfigured machine applies the default Local Protection preset.
+		targetPolicy = defender.DefaultPolicy()
+		targetPrefs.AutoHeal = true
+	}
+
+	if remote, handled := sendToRunningGovernor("/api/config", map[string]any{
+		"mode":        defender.ModeActive,
+		"policy":      targetPolicy,
+		"preferences": targetPrefs,
+	}); handled {
+		printEnforceResult(remote.Result)
+		if !remote.OK && len(remote.Result.Warnings) == 0 {
+			fmt.Fprintf(os.Stderr, "  [!] %s\n", remote.Message)
+		}
+		runStatus(nil)
+		return
+	}
+
+	var (
+		res defender.EnforceResult
+		err error
+	)
+	if presetID != "" {
+		res, err = gov.ApplyPreset(presetID)
+	} else {
+		res, err = gov.UpdateConfig(defender.ModeActive, targetPolicy, targetPrefs)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Note saving settings: %v\n", err)
 	}
-	for _, a := range res.Applied {
-		fmt.Printf("  [✓] %s\n", a)
-	}
-	for _, w := range res.Warnings {
-		fmt.Printf("  [!] %s\n", w)
-	}
+	printEnforceResult(res)
 	runStatus(nil)
 }
 
-func runSet(args []string) {
+func parseStrictBool(v string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "on", "true", "1", "yes", "enabled", "enable":
+		return true, nil
+	case "off", "false", "0", "no", "disabled", "disable":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value %q (expected on|off|true|false|1|0)", v)
+	}
+}
+
+func applySetArgs(pol defender.Policy, args []string) (defender.Policy, error) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: shieldsheriff set <key>=<value> [key=value ...]")
-		fmt.Fprintln(os.Stderr, "Examples:")
-		fmt.Fprintln(os.Stderr, "  shieldsheriff set realtime=on cloud=off samples=off nags=off")
-		fmt.Fprintln(os.Stderr, "  shieldsheriff set behavior=off script=off systray=mute")
-		os.Exit(1)
+		return pol, fmt.Errorf("no key=value settings provided")
 	}
-
-	gov := sheriff.NewGovernor()
-	_, ord, _, _, _ := gov.Snapshot()
-	ord.PresetName = "custom"
-
-	parseBool := func(v string) bool {
-		v = strings.ToLower(strings.TrimSpace(v))
-		return v == "on" || v == "true" || v == "1" || v == "yes" || v == "enabled"
-	}
+	pol = pol.Clone()
+	pol.PresetID = "custom"
 
 	for _, arg := range args {
 		parts := strings.SplitN(arg, "=", 2)
 		if len(parts) != 2 {
-			fmt.Fprintf(os.Stderr, "Invalid key=value pair: %q\n", arg)
-			os.Exit(1)
+			return pol, fmt.Errorf("invalid key=value pair: %q", arg)
 		}
 		k := strings.ToLower(strings.TrimSpace(parts[0]))
 		v := strings.ToLower(strings.TrimSpace(parts[1]))
 
 		switch k {
 		case "realtime", "rtp":
-			ord.RealtimeProtection = parseBool(v)
+			b, err := parseStrictBool(v)
+			if err != nil {
+				return pol, fmt.Errorf("%s: %w", k, err)
+			}
+			pol.RealtimeProtection = b
 		case "behavior", "bm":
-			ord.BehaviorMonitoring = parseBool(v)
+			b, err := parseStrictBool(v)
+			if err != nil {
+				return pol, fmt.Errorf("%s: %w", k, err)
+			}
+			pol.BehaviorMonitoring = b
 		case "ioav", "downloads":
-			ord.IOAVProtection = parseBool(v)
+			b, err := parseStrictBool(v)
+			if err != nil {
+				return pol, fmt.Errorf("%s: %w", k, err)
+			}
+			pol.IOAVProtection = b
 		case "script", "amsi":
-			ord.ScriptScanning = parseBool(v)
+			b, err := parseStrictBool(v)
+			if err != nil {
+				return pol, fmt.Errorf("%s: %w", k, err)
+			}
+			pol.ScriptScanning = b
 		case "network", "net":
 			switch v {
 			case "off", "0", "false":
-				ord.NetworkProtection = 0
+				pol.NetworkProtection = 0
 			case "on", "block", "1", "true":
-				ord.NetworkProtection = 1
+				pol.NetworkProtection = 1
 			case "audit", "2":
-				ord.NetworkProtection = 2
+				pol.NetworkProtection = 2
+			default:
+				return pol, fmt.Errorf("invalid network value %q (expected off|block|audit)", v)
 			}
 		case "cloud", "maps", "spynet":
 			switch v {
 			case "off", "0", "false":
-				ord.CloudProtection = 0
+				pol.CloudProtection = 0
 			case "basic", "1":
-				ord.CloudProtection = 1
+				pol.CloudProtection = 1
 			case "advanced", "on", "2", "true":
-				ord.CloudProtection = 2
+				pol.CloudProtection = 2
+			default:
+				return pol, fmt.Errorf("invalid cloud value %q (expected off|basic|advanced)", v)
 			}
 		case "samples", "submit":
 			switch v {
 			case "off", "never", "2", "false":
-				ord.SampleSubmission = 2
+				pol.SampleSubmission = 2
 			case "prompt", "0":
-				ord.SampleSubmission = 0
+				pol.SampleSubmission = 0
 			case "safe", "1", "on", "true":
-				ord.SampleSubmission = 1
+				pol.SampleSubmission = 1
 			case "all", "3":
-				ord.SampleSubmission = 3
+				pol.SampleSubmission = 3
+			default:
+				return pol, fmt.Errorf("invalid samples value %q (expected never|prompt|safe|all)", v)
 			}
 		case "nags", "notifications":
-			// nags=off means SuppressAllNags=true
-			if v == "off" || v == "silence" || v == "mute" || v == "suppressed" || v == "0" {
-				ord.SuppressAllNags = true
-				ord.SuppressEnhancedNags = true
-			} else {
-				ord.SuppressAllNags = false
-				ord.SuppressEnhancedNags = false
+			switch v {
+			case "off", "silence", "mute", "suppressed", "0", "false":
+				pol.SuppressAllNags = true
+				pol.SuppressEnhancedNags = true
+			case "on", "allow", "show", "1", "true":
+				pol.SuppressAllNags = false
+				pol.SuppressEnhancedNags = false
+			default:
+				return pol, fmt.Errorf("invalid nags value %q (expected off|on)", v)
 			}
 		case "systray", "tray-nag":
-			if v == "mute" || v == "hide" || v == "off" || v == "0" {
-				ord.MuteWindowsSecSystray = true
-			} else {
-				ord.MuteWindowsSecSystray = false
+			switch v {
+			case "mute", "hide", "off", "0":
+				pol.MuteWindowsSecSystray = true
+			case "show", "visible", "on", "1":
+				pol.MuteWindowsSecSystray = false
+			default:
+				return pol, fmt.Errorf("invalid systray value %q (expected mute|show)", v)
 			}
 		case "watch":
 			if v == "" || v == "none" || v == "off" {
-				ord.AutoStandDownProcesses = nil
+				pol.AutoPauseProcesses = []string{}
 			} else {
-				ord.AutoStandDownProcesses = strings.Split(v, ",")
+				raw := strings.Split(parts[1], ",")
+				list := make([]string, 0, len(raw))
+				for _, item := range raw {
+					if trimmed := strings.TrimSpace(item); trimmed != "" {
+						list = append(list, trimmed)
+					}
+				}
+				pol.AutoPauseProcesses = list
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "Unknown setting %q\n", k)
-			os.Exit(1)
+			return pol, fmt.Errorf("unknown setting %q", k)
 		}
 	}
+	return pol, pol.Validate()
+}
 
-	res, _ := gov.UpdateOrders(ord)
-	for _, a := range res.Applied {
-		fmt.Printf("  [✓] %s\n", a)
+func runSet(args []string) {
+	cleanArgs, wantElevate := stripElevateFlags(args)
+	if len(cleanArgs) == 0 {
+		fmt.Fprintln(os.Stderr, "Usage: shiesh set <key>=<value> [key=value ...] [--elevate]")
+		fmt.Fprintln(os.Stderr, "Examples:")
+		fmt.Fprintln(os.Stderr, "  shiesh set realtime=on cloud=off samples=never nags=off")
+		fmt.Fprintln(os.Stderr, "  shiesh set behavior=off script=off systray=mute")
+		os.Exit(1)
 	}
-	for _, w := range res.Warnings {
-		fmt.Printf("  [!] %s\n", w)
+
+	// Validate inputs before requesting elevation so typos fail fast without a UAC prompt.
+	gov := sheriff.NewGovernor()
+	_, cfg, _, _ := gov.Snapshot()
+	updatedPolicy, err := applySetArgs(cfg.Policy, cleanArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
+
+	if !defender.IsProcessElevated() && wantElevate {
+		forward := append([]string{"set"}, cleanArgs...)
+		fmt.Println("Requesting Administrator privileges via UAC to apply settings...")
+		if err := defender.RelaunchElevated(forward); err != nil {
+			fmt.Fprintf(os.Stderr, "Elevation failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	prefs := cfg.Preferences
+	if cfg.Mode == defender.ModeUnconfigured {
+		prefs.AutoHeal = true
+	}
+
+	if remote, handled := sendToRunningGovernor("/api/config", map[string]any{
+		"mode":        defender.ModeActive,
+		"policy":      updatedPolicy,
+		"preferences": prefs,
+	}); handled {
+		printEnforceResult(remote.Result)
+		if !remote.OK && len(remote.Result.Warnings) == 0 {
+			fmt.Fprintf(os.Stderr, "  [!] %s\n", remote.Message)
+		}
+		runStatus(nil)
+		return
+	}
+
+	res, saveErr := gov.UpdateConfig(defender.ModeActive, updatedPolicy, prefs)
+	if saveErr != nil {
+		fmt.Fprintf(os.Stderr, "Note saving settings: %v\n", saveErr)
+	}
+	printEnforceResult(res)
 	runStatus(nil)
 }
 
 func runPause(args []string) {
+	cleanArgs, wantElevate := stripElevateFlags(args)
 	mins := 30
-	if len(args) > 0 {
-		if m, err := strconv.Atoi(args[0]); err == nil && m > 0 {
-			mins = m
+	if len(cleanArgs) > 1 {
+		fmt.Fprintln(os.Stderr, "Usage: shiesh pause [minutes] [--elevate]")
+		os.Exit(1)
+	}
+	if len(cleanArgs) == 1 {
+		m, err := strconv.Atoi(cleanArgs[0])
+		if err != nil || m <= 0 {
+			fmt.Fprintf(os.Stderr, "Invalid pause duration %q (expected a positive number of minutes)\n", cleanArgs[0])
+			os.Exit(1)
 		}
+		mins = m
 	}
+
+	if !defender.IsProcessElevated() && wantElevate {
+		forward := append([]string{"pause"}, cleanArgs...)
+		if err := defender.RelaunchElevated(forward); err != nil {
+			fmt.Fprintf(os.Stderr, "Elevation failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	reason := fmt.Sprintf("CLI %dm Pause", mins)
+	if remote, handled := sendToRunningGovernor("/api/pause", map[string]any{
+		"minutes": mins,
+		"reason":  reason,
+	}); handled {
+		fmt.Println(remote.Message)
+		printWarnings(remote.Result.Warnings)
+		if !remote.OK {
+			os.Exit(1)
+		}
+		return
+	}
+
 	gov := sheriff.NewGovernor()
-	res := gov.StartStandDown(time.Duration(mins)*time.Minute, fmt.Sprintf("CLI %dm Pause", mins))
-	fmt.Printf("Protection paused for %d minutes.\n", mins)
-	for _, w := range res.Warnings {
-		fmt.Printf("  [!] %s\n", w)
+	res, err := gov.StartPause(time.Duration(mins)*time.Minute, reason)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Pause failed: %v\n", err)
+		os.Exit(1)
 	}
+	fmt.Printf("Protection paused for %d minutes.\n", mins)
+	printWarnings(res.Warnings)
+	fmt.Println("  [!] Note: No ShieldSheriff tray instance is running to auto-resume when the timer expires.")
+	fmt.Println("      Run `shiesh tray --elevate` for automatic resume, or `shiesh resume` when done.")
 }
 
-func runResume() {
+func runResume(args []string) {
+	_, wantElevate := stripElevateFlags(args)
+	if !defender.IsProcessElevated() && wantElevate {
+		if err := defender.RelaunchElevated([]string{"resume"}); err != nil {
+			fmt.Fprintf(os.Stderr, "Elevation failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if remote, handled := sendToRunningGovernor("/api/pause", map[string]any{"minutes": 0}); handled {
+		fmt.Println(remote.Message)
+		printWarnings(remote.Result.Warnings)
+		if !remote.OK {
+			os.Exit(1)
+		}
+		return
+	}
+
 	gov := sheriff.NewGovernor()
-	res := gov.ResumeFromStandDown()
+	res, err := gov.ResumePause()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Resume failed: %v\n", err)
+		os.Exit(1)
+	}
 	fmt.Println("Protection resumed.")
-	for _, w := range res.Warnings {
-		fmt.Printf("  [!] %s\n", w)
+	printWarnings(res.Warnings)
+}
+
+func runPassive(args []string) {
+	_, wantElevate := stripElevateFlags(args)
+	if !defender.IsProcessElevated() && wantElevate {
+		if err := defender.RelaunchElevated([]string{"passive"}); err != nil {
+			fmt.Fprintf(os.Stderr, "Elevation failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if remote, handled := sendToRunningGovernor("/api/passive", nil); handled {
+		fmt.Println(remote.Message)
+		printEnforceResult(remote.Result)
+		if !remote.OK {
+			os.Exit(1)
+		}
+		return
+	}
+
+	gov := sheriff.NewGovernor()
+	res, err := gov.EnterPassiveMode()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Note saving passive state: %v\n", err)
+	}
+	printEnforceResult(res)
+	if !res.Success {
+		os.Exit(1)
 	}
 }
 
@@ -509,36 +724,6 @@ func runUpdate() {
 	fmt.Println("Definitions updated.")
 }
 
-func runService(args []string) {
-	sub := "status"
-	if len(args) > 0 {
-		sub = strings.ToLower(args[0])
-	}
-	switch sub {
-	case "run":
-		if err := sheriff.RunWindowsService(); err != nil {
-			fmt.Fprintf(os.Stderr, "Service dispatcher error: %v\n", err)
-			os.Exit(1)
-		}
-	case "install":
-		msg, err := sheriff.InstallService()
-		fmt.Println(msg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	case "uninstall", "remove":
-		msg, err := sheriff.UninstallService()
-		fmt.Println(msg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	default:
-		fmt.Fprintln(os.Stderr, "Usage: shieldsheriff service <install|uninstall|run>")
-	}
-}
-
 func runVersion(args []string) {
 	for _, a := range args {
 		if a == "--json" || a == "-j" {
@@ -550,29 +735,42 @@ func runVersion(args []string) {
 	fmt.Println(version.Summary())
 }
 
+func printEnforceResult(res defender.EnforceResult) {
+	for _, a := range res.Applied {
+		fmt.Printf("  [✓] %s\n", a)
+	}
+	printWarnings(res.Warnings)
+}
+
+func printWarnings(warnings []string) {
+	for _, w := range warnings {
+		fmt.Printf("  [!] %s\n", w)
+	}
+}
+
 func printUsage() {
 	fmt.Printf("ShieldSheriff v%s (%s) - Simple, Nag-Free Control for Windows Defender\n\n", version.Version, version.Codename)
 	fmt.Println(`Usage:
-  shieldsheriff                         Inspect live Defender status (read-only) and exit
-  shieldsheriff ui [--elevate]          Launch Dashboard UI (Read-Only window without tray unless --elevate)
-  shieldsheriff tray [--elevate]        Launch persistent System Tray (requires elevation / --elevate)
-  shieldsheriff status [--json]         Inspect live Defender status, Tamper Protection & Drift
-  shieldsheriff apply [--preset <id>]   Apply configuration (use --elevate for UAC prompt)
-  shieldsheriff set <k>=<v> ...         Configure individual settings
-  shieldsheriff pause [minutes]         Temporarily pause Real-Time Protection
-  shieldsheriff resume                  Resume Real-Time Protection from pause
-  shieldsheriff scan                    Run on-demand Quick Scan via MpCmdRun.exe
-  shieldsheriff update                  Update Defender definitions via MpCmdRun.exe
-  shieldsheriff service <install|uninstall>  Manage 24/7 SYSTEM background enforcement service
-  shieldsheriff version [--json]        Print CalVer release & Windows Defender platform metadata`)
-	fmt.Println(`
-Presets (--preset):
-  cloud-local         Local + Cloud Protection ON, Sample Upload OFF, All Nags Silenced
-  local-protection    Real-Time ON, Cloud OFF, Sample Submission OFF, All Nags Silenced
-  workstation         Fast Builds (Behavior/Script hooks OFF, Auto-Pause on cargo/msbuild)
-  on-demand           Real-Time OFF permanently (no 24h reset), Manual Scans ON, Nags Silenced
+  shiesh                         Inspect live Defender status (read-only) and exit
+  shiesh ui [--elevate]          Launch Dashboard UI (Read-Only window without tray unless --elevate)
+  shiesh tray [--elevate]        Launch persistent System Tray (requires elevation / --elevate)
+  shiesh status [--json]         Inspect live Defender status, Tamper Protection & Drift
+  shiesh apply [--preset <id>]   Apply configuration (use --elevate for UAC prompt)
+  shiesh set <k>=<v> ...         Configure individual settings (use --elevate for UAC prompt)
+  shiesh pause [minutes]         Temporarily pause Real-Time Protection
+  shiesh resume                  Resume Real-Time Protection from pause
+  shiesh passive [--elevate]     Stop enforcing and revert ShieldSheriff policy changes
+  shiesh scan                    Run on-demand Quick Scan via MpCmdRun.exe
+  shiesh update                  Update Defender definitions via MpCmdRun.exe
+  shiesh version [--json]        Print CalVer release & Windows Defender platform metadata`)
 
-Granular Setting Keys (shieldsheriff set ...):
+	fmt.Println("\nPresets (--preset):")
+	for _, p := range defender.BuiltinPresets() {
+		fmt.Printf("  %-18s  %s\n", p.ID, p.Description)
+	}
+
+	fmt.Println(`
+Granular Setting Keys (shiesh set ...):
   realtime=on|off     behavior=on|off     ioav=on|off         script=on|off
   cloud=off|basic|advanced                samples=never|prompt|safe|all
   nags=off|on         systray=mute|show   network=off|block|audit

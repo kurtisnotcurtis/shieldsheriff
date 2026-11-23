@@ -1,7 +1,8 @@
+//go:build windows
+
 package ui
 
 import (
-	"strings"
 	"syscall"
 	"unsafe"
 
@@ -11,10 +12,6 @@ import (
 var (
 	modUser32               = syscall.NewLazyDLL("user32.dll")
 	modDwmapi               = syscall.NewLazyDLL("dwmapi.dll")
-	procEnumWindows         = modUser32.NewProc("EnumWindows")
-	procIsWindowVisible     = modUser32.NewProc("IsWindowVisible")
-	procGetWindowTextW      = modUser32.NewProc("GetWindowTextW")
-	procGetClassNameW       = modUser32.NewProc("GetClassNameW")
 	procIsIconic            = modUser32.NewProc("IsIconic")
 	procShowWindow          = modUser32.NewProc("ShowWindow")
 	procSetForegroundWindow = modUser32.NewProc("SetForegroundWindow")
@@ -36,7 +33,7 @@ const (
 	dwmwaCaptionColor           = 35
 	dwmwaSystemBackdropType     = 38
 
-	dwmwcpRound     = 2
+	dwmwcpRound      = 2
 	dwmsbtMainWindow = 2 // Mica
 )
 
@@ -79,57 +76,9 @@ func focusWindowHandle(hwnd uintptr) {
 	_, _, _ = procSetForegroundWindow.Call(hwnd)
 }
 
-// findCommandCenterWindows returns HWNDs of visible ShieldSheriff Command Center windows.
-func findCommandCenterWindows() []uintptr {
-	var found []uintptr
-
-	cb := syscall.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
-		vis, _, _ := procIsWindowVisible.Call(hwnd)
-		if vis == 0 {
-			return 1
-		}
-
-		var titleBuf [256]uint16
-		n, _, _ := procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&titleBuf[0])), uintptr(len(titleBuf)))
-		if n == 0 {
-			return 1
-		}
-		title := syscall.UTF16ToString(titleBuf[:n])
-		if title != "ShieldSheriff" && (!strings.Contains(title, "ShieldSheriff") || !strings.Contains(title, "Command Center")) {
-			return 1
-		}
-
-		var classBuf [128]uint16
-		cn, _, _ := procGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&classBuf[0])), uintptr(len(classBuf)))
-		className := ""
-		if cn > 0 {
-			className = syscall.UTF16ToString(classBuf[:cn])
-		}
-
-		if className == "Chrome_WidgetWin_1" || title == "ShieldSheriff" || title == "ShieldSheriff - Command Center" {
-			found = append(found, hwnd)
-		}
-		return 1
-	})
-
-	_, _, _ = procEnumWindows.Call(cb, 0)
-	return found
-}
-
-// focusExistingCommandCenterWindow finds an already-open ShieldSheriff Command Center
-// browser/app window and brings it to the foreground.
-func focusExistingCommandCenterWindow() bool {
-	wins := findCommandCenterWindows()
-	if len(wins) == 0 {
-		return false
+func closeWindowHandle(hwnd uintptr) {
+	if hwnd == 0 {
+		return
 	}
-	focusWindowHandle(wins[0])
-	return true
-}
-
-// closeExistingCommandCenterWindow posts WM_CLOSE to any open Command Center windows.
-func closeExistingCommandCenterWindow() {
-	for _, hwnd := range findCommandCenterWindows() {
-		_, _, _ = procPostMessageW.Call(hwnd, wmClose, 0, 0)
-	}
+	_, _, _ = procPostMessageW.Call(hwnd, wmClose, 0, 0)
 }

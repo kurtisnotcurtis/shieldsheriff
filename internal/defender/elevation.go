@@ -1,58 +1,22 @@
+//go:build windows
+
 package defender
 
 import (
 	"os"
 	"strings"
-	"syscall"
-	"unsafe"
-)
 
-var (
-	modAdvapi32 = syscall.NewLazyDLL("advapi32.dll")
-	modShell32  = syscall.NewLazyDLL("shell32.dll")
-	modKernel32 = syscall.NewLazyDLL("kernel32.dll")
-
-	procGetTokenInformation = modAdvapi32.NewProc("GetTokenInformation")
-	procShellExecuteW       = modShell32.NewProc("ShellExecuteW")
+	"golang.org/x/sys/windows"
 )
 
 const (
-	tokenQuery          = 0x0008
-	tokenElevationClass = 20
-	swHide              = 0
-	swShowNormal        = 1
+	swHide       = 0
+	swShowNormal = 1
 )
-
-type tokenElevation struct {
-	TokenIsElevated uint32
-}
 
 // IsProcessElevated returns true if the current process has an elevated Administrator or SYSTEM token.
 func IsProcessElevated() bool {
-	var token syscall.Token
-	currProc, err := syscall.GetCurrentProcess()
-	if err != nil {
-		return false
-	}
-	err = syscall.OpenProcessToken(currProc, tokenQuery, &token)
-	if err != nil {
-		return false
-	}
-	defer token.Close()
-
-	var elev tokenElevation
-	var retLen uint32
-	r1, _, _ := procGetTokenInformation.Call(
-		uintptr(token),
-		uintptr(tokenElevationClass),
-		uintptr(unsafe.Pointer(&elev)),
-		unsafe.Sizeof(elev),
-		uintptr(unsafe.Pointer(&retLen)),
-	)
-	if r1 == 0 {
-		return false
-	}
-	return elev.TokenIsElevated != 0
+	return DefaultBackend().IsElevated()
 }
 
 // RelaunchElevated launches a new instance of the current executable with Administrator privileges via UAC ("runas").
@@ -61,8 +25,14 @@ func RelaunchElevated(extraArgs []string) error {
 	if err != nil {
 		return err
 	}
-	verbPtr, _ := syscall.UTF16PtrFromString("runas")
-	exePtr, _ := syscall.UTF16PtrFromString(exe)
+	verbPtr, err := windows.UTF16PtrFromString("runas")
+	if err != nil {
+		return err
+	}
+	exePtr, err := windows.UTF16PtrFromString(exe)
+	if err != nil {
+		return err
+	}
 
 	var argStr string
 	if len(extraArgs) > 0 {
@@ -76,51 +46,37 @@ func RelaunchElevated(extraArgs []string) error {
 		}
 		argStr = strings.Join(quoted, " ")
 	}
-	argPtr, _ := syscall.UTF16PtrFromString(argStr)
+	argPtr, err := windows.UTF16PtrFromString(argStr)
+	if err != nil {
+		return err
+	}
 	cwd, _ := os.Getwd()
-	cwdPtr, _ := syscall.UTF16PtrFromString(cwd)
+	cwdPtr, err := windows.UTF16PtrFromString(cwd)
+	if err != nil {
+		return err
+	}
 
-	showCmd := uintptr(swShowNormal)
+	showCmd := int32(swShowNormal)
 	if len(extraArgs) > 0 {
 		switch strings.ToLower(extraArgs[0]) {
 		case "ui", "tray", "dashboard", "--minimized":
-			showCmd = uintptr(swHide)
+			showCmd = int32(swHide)
 		}
 	}
 
-	r1, _, lastErr := procShellExecuteW.Call(
-		0,
-		uintptr(unsafe.Pointer(verbPtr)),
-		uintptr(unsafe.Pointer(exePtr)),
-		uintptr(unsafe.Pointer(argPtr)),
-		uintptr(unsafe.Pointer(cwdPtr)),
-		showCmd,
-	)
-	// ShellExecuteW returns a value > 32 on success.
-	if r1 <= 32 {
-		if lastErr != nil && lastErr != syscall.Errno(0) {
-			return lastErr
-		}
-		return syscall.EACCES
-	}
-	return nil
+	return windows.ShellExecute(0, verbPtr, exePtr, argPtr, cwdPtr, showCmd)
 }
 
 // OpenWindowsSecuritySettings opens the Windows Security "Virus & threat protection settings" page
 // where the user can perform the one-time Tamper Protection toggle.
 func OpenWindowsSecuritySettings() error {
-	verbPtr, _ := syscall.UTF16PtrFromString("open")
-	uriPtr, _ := syscall.UTF16PtrFromString("windowsdefender://threatsettings")
-	r1, _, lastErr := procShellExecuteW.Call(
-		0,
-		uintptr(unsafe.Pointer(verbPtr)),
-		uintptr(unsafe.Pointer(uriPtr)),
-		0,
-		0,
-		swShowNormal,
-	)
-	if r1 <= 32 {
-		return lastErr
+	verbPtr, err := windows.UTF16PtrFromString("open")
+	if err != nil {
+		return err
 	}
-	return nil
+	uriPtr, err := windows.UTF16PtrFromString("windowsdefender://threatsettings")
+	if err != nil {
+		return err
+	}
+	return windows.ShellExecute(0, verbPtr, uriPtr, nil, nil, swShowNormal)
 }

@@ -28,7 +28,7 @@ Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a capable local anti
 - **Granular Engine Control:** Keep `WinDefend` alive while independently controlling **Real-Time Protection**, **Behavior Monitoring**, **Downloads & Attachments (IOAV)**, **Script Scanning (AMSI)**, **Network Protection**, **Cloud Protection (MAPS)**, and **Sample Submission**.
 - **Silence Security Center Nags:** Suppresses Windows Security toast notifications and optionally hides the Windows Security system tray icon (with automatic registry backup and restore).
 - **Auto-Heal Update Resets:** Periodically checks your live Defender state (default every 15s, configurable) and restores your chosen settings if a Windows Update or background task resets them.
-- **Timed Pause & Auto-Pause on Builds:** Temporarily pause Real-Time Protection for `15m`, `30m`, `1h`, or `4h`, or pause automatically whenever specified compilers, linkers, or games (`cargo.exe`, `msbuild.exe`, `link.exe`, `rustc.exe`, etc.) are running.
+- **Timed Pause & Auto-Pause on Builds:** Temporarily pause Real-Time Protection for `15m`, `30m`, `1h`, or `4h`, or pause automatically whenever specified compilers or games (`cargo.exe`, `msbuild.exe`, `rustc.exe`, or path-scoped entries like `msvc\bin\link.exe`) are running.
 
 ---
 
@@ -40,14 +40,14 @@ Choose a one-click preset from the **Dashboard** or **System Tray menu**, or cus
 | :--- | :--- |
 | **Cloud + Local** | Keeps **Local + Cloud Protection (MAPS) ON**, turns automatic file **Sample Uploads OFF**, and silences all Security Center nags. |
 | **Local Protection** *(Default)* | **Local Real-Time &amp; Behavior ON**, Cloud Protection **OFF**, Sample Submission **OFF**, all Windows Security nags **Silenced**. |
-| **Workstation** | Keeps core Real-Time scanning ON, turns heavy **Behavior Monitoring** &amp; **Script Scanning** hooks **OFF**, and auto-pauses scanning while `cargo.exe`, `rustc.exe`, `msbuild.exe`, or `link.exe` run. |
+| **Workstation** | Keeps core Real-Time scanning ON, turns heavy **Behavior Monitoring** &amp; **Script Scanning** hooks **OFF**, and auto-pauses scanning while `cargo.exe`, `rustc.exe`, or `msbuild.exe` run. |
 | **On-Demand Only** | Turns **Real-Time Protection OFF permanently** (no 24-hour reset) while keeping manual **Quick Scans** and **Definition Updates** working. |
 
 ---
 
 ## Installation
 
-> **Requirements:** Windows 11 (`x64` or `arm64`). Administrator privileges (UAC) are required to apply Defender policies, run the persistent System Tray, or install the background service.
+> **Requirements:** Windows 11 (`x64` or `arm64`). Administrator privileges (UAC) are required to apply Defender policies or run the persistent System Tray.
 
 ### Option 1: Install via WinGet
 ```powershell
@@ -65,7 +65,7 @@ Scoop installs `shiesh.exe`, adds `shiesh` to your `PATH`, and creates the **Shi
 ### Option 3: Portable `.zip` Archive
 1. Download `shieldsheriff-<version>-windows-amd64.zip` (or `arm64.zip`) from [GitHub Releases](https://github.com/kurtisnotcurtis/shieldsheriff/releases).
 2. Extract `shiesh.exe` into a permanent folder (for example, `C:\Tools\ShieldSheriff\`).
-   > **Note for Portable Users:** If you enable **Start in System Tray at Windows Logon** or install the **Background Service**, Windows registers the current path of `shiesh.exe`. Place `shiesh.exe` in its permanent folder before enabling startup/service options.
+   > **Note for Portable Users:** If you enable **Run at Windows Startup**, Windows registers the current path of `shiesh.exe`. Place `shiesh.exe` in a permanent, Administrator-controlled folder before enabling startup.
 
 ### One-Time Prerequisite: Turn Off Tamper Protection
 Windows Defender's **Tamper Protection** blocks local apps and Group Policy keys from changing Defender settings. Before applying policies for the first time:
@@ -87,15 +87,15 @@ Open **ShieldSheriff** from the Start Menu (after WinGet or Scoop install) or do
   - **Passive Mode:** Hollow slate shield outline when ShieldSheriff is not actively enforcing policies.
 
 ### 2. CLI & Automation
-For scripting, JSON status inspection (`shiesh status --json`), unattended preset application, and service management, see the **[CLI & Automation Reference](CLI.md)**.
+For scripting, JSON status inspection (`shiesh status --json`), unattended preset application, and timed pauses, see the **[CLI & Automation Reference](CLI.md)**.
 
 ---
 
 ## Reverting to Windows Defaults & Uninstalling
 
-1. **Revert Defender Policies:** Open the Dashboard or right-click the System Tray icon and select **Passive Mode (Stop Enforcing)** to remove ShieldSheriff's policy locks and restore standard Windows Security notifications.
-2. **Remove Background Service / Startup (if enabled):**
-   - Turn off **Run at Windows Startup** and click **Remove Service** in the **Settings** tab of the Dashboard (or see [CLI.md](CLI.md)).
+1. **Revert Defender Policies:** Open the Dashboard, right-click the System Tray icon, or run `shiesh passive --elevate` to stop enforcing and restore all Defender & Security Center settings to their pre-ShieldSheriff snapshot.
+2. **Disable Startup (if enabled):**
+   - Turn off **Run at Windows Startup** in the **Settings** tab of the Dashboard.
 3. **Uninstall the Binary:**
    - **WinGet:** `winget uninstall kurtisnotcurtis.ShieldSheriff`
    - **Scoop:** `scoop uninstall shieldsheriff`

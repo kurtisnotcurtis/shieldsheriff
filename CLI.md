@@ -2,7 +2,7 @@
 
 ShieldSheriff includes a full command-line interface (`shiesh.exe` / `shiesh`) for scripting, unattended setup, and inspecting live Windows Defender state.
 
-> **Requirements:** Windows 11 (`x64` or `arm64`). Reading status (`shiesh` / `shiesh status`) works without elevation. Applying presets, changing settings, running the persistent System Tray, or installing the background service requires Administrator privileges (or `--elevate` for a UAC prompt).
+> **Requirements:** Windows 11 (`x64` or `arm64`). Reading status (`shiesh` / `shiesh status`) works without elevation. Applying presets, changing settings, or running the persistent System Tray requires Administrator privileges (or `--elevate` for a UAC prompt).
 
 ---
 
@@ -48,8 +48,8 @@ shiesh apply --preset workstation --elevate
 # Customize individual engine & notification settings (run from an elevated terminal):
 shiesh set realtime=on behavior=off script=off cloud=off samples=never nags=off
 
-# Auto-pause Real-Time Protection whenever specified processes are running:
-shiesh set watch=cargo.exe,msbuild.exe,link.exe,rustc.exe
+# Auto-pause Real-Time Protection whenever specified processes are running (supports exe name or path suffix):
+shiesh set watch=cargo.exe,msbuild.exe,rustc.exe
 ```
 
 ### Preset IDs
@@ -58,7 +58,7 @@ shiesh set watch=cargo.exe,msbuild.exe,link.exe,rustc.exe
 | :--- | :--- | :--- |
 | `cloud-local` | Cloud + Local | All local engines + Cloud Protection (MAPS) ON, Sample Submission OFF, all nags silenced |
 | `local-protection` | Local Protection *(Default)* | Real-Time & Behavior ON, Cloud OFF, Sample Submission OFF, all nags silenced |
-| `workstation` | Workstation | Real-Time & IOAV ON, Behavior & Script hooks OFF, auto-pauses on `cargo.exe`, `msbuild.exe`, `link.exe`, `rustc.exe` |
+| `workstation` | Workstation | Real-Time & IOAV ON, Behavior & Script hooks OFF, auto-pauses on `cargo.exe`, `msbuild.exe`, `rustc.exe` |
 | `on-demand` | On-Demand Only | Real-Time Protection OFF permanently (no 24h reset); manual scans & definition updates active |
 
 ### Granular `shiesh set` Keys
@@ -78,18 +78,18 @@ shiesh set watch=cargo.exe,msbuild.exe,link.exe,rustc.exe
 
 ---
 
-## Pausing, Scanning & Background Service
+## Pausing, Passive Mode & Scanning
 
 ```powershell
-# Temporarily pause Real-Time Protection for 30 minutes, or resume immediately:
-shiesh pause 30
-shiesh resume
+# Temporarily pause Real-Time Protection for 30 minutes, or resume immediately
+# (coordinates with a running elevated tray instance for automatic timer resume):
+shiesh pause 30 --elevate
+shiesh resume --elevate
+
+# Enter Passive Mode and revert all ShieldSheriff Defender/notification overrides:
+shiesh passive --elevate
 
 # Run an on-demand Defender Quick Scan or definition update (works even in On-Demand Only mode):
 shiesh scan
 shiesh update
-
-# Install or remove the 24/7 background Windows Service (runs as SYSTEM across reboots):
-shiesh service install
-shiesh service uninstall
 ```

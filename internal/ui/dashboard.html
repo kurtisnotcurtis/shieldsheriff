@@ -723,7 +723,7 @@
 
       <div class="watch-bar" id="rowWatch">
         <label for="txtWatchProcs">Auto-Pause Watchlist <span class="preview-tag" id="prevWatch"></span></label>
-        <input type="text" id="txtWatchProcs" oninput="stageOrdersFromUI(true)" placeholder="e.g. cargo.exe, msbuild.exe, link.exe, rustc.exe (pauses Real-Time while running)">
+        <input type="text" id="txtWatchProcs" oninput="stageFromUI(true)" placeholder="e.g. cargo.exe, msbuild.exe, rustc.exe (or path suffix like msvc\bin\link.exe)">
         <button onclick="applyChanges()">Save Watchlist</button>
       </div>
     </div>
@@ -749,18 +749,14 @@
 
           <div class="card">
             <div class="card-head">
-              <h2>Tools &amp; Service</h2>
-              <span class="card-sub">On-demand scans, Defender UI &amp; SYSTEM service</span>
+              <h2>Tools &amp; Diagnostics</h2>
+              <span class="card-sub">On-demand scans, Defender UI &amp; update checks</span>
             </div>
-            <div class="btn-row" style="margin-bottom: 10px;">
+            <div class="btn-row">
               <button onclick="apiCall('/api/quick-scan')">Quick Scan</button>
               <button onclick="apiCall('/api/update-sigs')">Update Definitions</button>
               <button onclick="apiCall('/api/open-winsec')">Windows Security UI</button>
               <button onclick="apiCall('/api/check-updates')">Check for Updates</button>
-            </div>
-            <div class="btn-row">
-              <button onclick="apiCall('/api/service-install')">Install SYSTEM Service</button>
-              <button onclick="apiCall('/api/service-uninstall')">Remove Service</button>
             </div>
           </div>
         </div>
@@ -910,8 +906,10 @@
 <div id="toast"></div>
 
 <script>
+const API_TOKEN = "__SHIELDSHERIFF_API_TOKEN__";
+
 let currentState = null;
-let stagedOrders = null;
+let stagedConfig = null; // { policy, preferences }
 let hoveredPresetId = null;
 let activeTab = 'orders';
 
@@ -942,12 +940,29 @@ const PRESET_META = {
   }
 };
 
-const PRESET_ORDER = [
-  "cloud-local",
-  "local-protection",
-  "workstation",
-  "on-demand"
-];
+async function apiFetch(path, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    'X-ShieldSheriff-Token': API_TOKEN,
+  };
+  return fetch(path, { ...options, headers });
+}
+
+function cloneConfigSlice(cfg) {
+  return {
+    policy: {
+      ...cfg.policy,
+      autoPauseProcesses: [...(cfg.policy.autoPauseProcesses || [])],
+    },
+    preferences: { ...cfg.preferences },
+  };
+}
+
+function isCustomOrUnconfigured(data, staged) {
+  const mode = data.config.mode;
+  const presetId = (staged && staged.policy.presetId) || data.config.policy.presetId || '';
+  return mode !== 'active' || presetId === 'custom' || presetId === '';
+}
 
 function switchTab(tab) {
   activeTab = tab;
@@ -956,7 +971,7 @@ function switchTab(tab) {
   document.getElementById('tabLogs').classList.toggle('active', tab === 'logs');
   const titles = { orders: 'Protection & Controls', ops: 'Settings', logs: 'Logs' };
   document.getElementById('pageTitle').textContent = titles[tab] || 'ShieldSheriff';
-  document.getElementById('navControls').classList.toggle('active', tab === 'orders' && currentState && (currentState.firstRun || currentState.orders.presetName === 'custom' || currentState.orders.presetName === 'unconfigured'));
+  document.getElementById('navControls').classList.toggle('active', tab === 'orders' && currentState && isCustomOrUnconfigured(currentState, stagedConfig));
   document.getElementById('navOps').classList.toggle('active', tab === 'ops');
   document.getElementById('navLogs').classList.toggle('active', tab === 'logs');
 }
@@ -971,7 +986,8 @@ function showToast(msg) {
 
 async function fetchState() {
   try {
-    const res = await fetch('/api/state');
+    const res = await apiFetch('/api/state');
+    if (!res.ok) return;
     const data = await res.json();
     currentState = data;
     renderState(data);
@@ -1009,9 +1025,9 @@ function renderPresetDiffPreview() {
     return;
   }
 
-  const cur = stagedOrders || currentState.orders;
-  const tgt = preset.orders;
-  const meta = PRESET_META[hoveredPresetId] || { title: preset.name };
+  const cur = (stagedConfig || currentState.config).policy;
+  const tgt = preset.policy;
+  const meta = PRESET_META[hoveredPresetId] || { title: preset.shortName || preset.name };
 
   document.querySelectorAll('.preview-diff').forEach(el => el.classList.remove('preview-diff'));
   document.querySelectorAll('.preview-tag').forEach(el => { el.textContent = ''; });
@@ -1038,8 +1054,8 @@ function renderPresetDiffPreview() {
   mark('rowNags', 'prevNags', !!cur.suppressAllNags !== !!tgt.suppressAllNags, tgt.suppressAllNags ? 'Silenced' : 'Active');
   mark('rowTray', 'prevTray', !!cur.muteWindowsSecSystray !== !!tgt.muteWindowsSecSystray, tgt.muteWindowsSecSystray ? 'Hidden' : 'Visible');
 
-  const curWatch = (cur.autoStandDownProcesses || []).join(', ');
-  const tgtWatch = (tgt.autoStandDownProcesses || []).join(', ');
+  const curWatch = (cur.autoPauseProcesses || []).join(', ');
+  const tgtWatch = (tgt.autoPauseProcesses || []).join(', ');
   mark('rowWatch', 'prevWatch', curWatch !== tgtWatch, tgtWatch ? 'Auto-Pause' : 'Cleared');
 
   hint.style.opacity = '1';
@@ -1062,14 +1078,27 @@ function applyWindowsTheme(theme) {
   }
 }
 
+function setHeroButton(label, className, onClick) {
+  const heroAction = document.getElementById('statusHeroAction');
+  heroAction.textContent = '';
+  if (!label) return;
+  const btn = document.createElement('button');
+  if (className) btn.className = className;
+  btn.textContent = label;
+  btn.addEventListener('click', onClick);
+  heroAction.appendChild(btn);
+}
+
 function renderState(data) {
   applyWindowsTheme(data.theme);
   const st = data.status;
-  if (!stagedOrders) {
-    stagedOrders = { ...data.orders };
-  }
-  const ord = stagedOrders;
-  const sd = data.standDown;
+  const savedCfg = data.config;
+  const view = stagedConfig || cloneConfigSlice(savedCfg);
+  const pol = view.policy;
+  const prefs = view.preferences;
+  const pause = savedCfg.pause || {};
+  const mode = savedCfg.mode || 'unconfigured';
+
   if (data.version && data.version.version) {
     document.getElementById('versionBadge').textContent = 'v' + data.version.version;
     document.getElementById('aboutVersion').textContent = 'v' + data.version.version;
@@ -1078,53 +1107,57 @@ function renderState(data) {
   const heroEl = document.getElementById('statusHero');
   const heroTitle = document.getElementById('statusHeroTitle');
   const heroDesc = document.getElementById('statusHeroDesc');
-  const heroAction = document.getElementById('statusHeroAction');
   const sidebarStatus = document.getElementById('sidebarStatus');
-  const levelName = ord.presetName === 'custom'
+  const levelName = pol.presetId === 'custom'
     ? 'Custom'
-    : ((PRESET_META[ord.presetName] && PRESET_META[ord.presetName].title) || ord.presetName);
+    : ((PRESET_META[pol.presetId] && PRESET_META[pol.presetId].title) || pol.presetId || 'Custom');
 
-  if (data.firstRun) {
-    sidebarStatus.textContent = ord.presetName === 'passive' ? 'Passive' : (st.realtimeProtection ? 'Protected' : 'Real-Time Off');
+  setHeroButton(null);
+  if (data.configError) {
+    sidebarStatus.textContent = 'Config Error';
+    heroEl.className = 'status-hero yellow';
+    heroTitle.textContent = 'Configuration Error · Enforcement Halted';
+    heroDesc.textContent = data.configError;
+  } else if (mode === 'unconfigured') {
+    sidebarStatus.textContent = st.realtimeProtection ? 'Protected' : 'Real-Time Off';
     heroEl.className = 'status-hero ' + (st.realtimeProtection ? 'green' : 'red');
-    heroTitle.textContent = ord.presetName === 'passive' ? 'Passive Mode · Not Enforcing' : 'First-Run Setup · Showing Current PC Settings';
-    heroDesc.textContent = ord.presetName === 'passive'
-      ? 'ShieldSheriff policies have been reverted. Select a preset or toggle any setting and click Apply Now to re-enable.'
-      : 'Select a preset on the left or adjust any toggle below to begin managing Windows Defender.';
-    heroAction.innerHTML = '';
-  } else if (sd.active) {
+    heroTitle.textContent = 'First-Run Setup · Showing Current PC Settings';
+    heroDesc.textContent = 'Select a preset on the left or adjust any toggle below to begin managing Windows Defender.';
+  } else if (mode === 'passive') {
+    sidebarStatus.textContent = 'Passive';
+    heroEl.className = 'status-hero ' + (st.realtimeProtection ? 'green' : 'red');
+    heroTitle.textContent = 'Passive Mode · Not Enforcing';
+    heroDesc.textContent = 'ShieldSheriff policies have been reverted. Select a preset or toggle any setting and click Apply Now to re-enable.';
+  } else if (pause.active) {
     sidebarStatus.textContent = 'Paused';
     heroEl.className = 'status-hero yellow';
-    heroTitle.textContent = 'Paused: ' + sd.reason;
-    heroDesc.textContent = 'Real-Time Protection is temporarily paused (yellow tray icon) and will resume automatically.';
-    heroAction.innerHTML = '<button onclick="standDown(0)">Resume Now</button>';
+    heroTitle.textContent = 'Paused: ' + (pause.reason || 'Temporary Pause');
+    heroDesc.textContent = 'Real-Time Protection is temporarily paused and will resume automatically.';
+    setHeroButton('Resume Now', '', () => pauseProtection(0));
   } else if (st.tamperProtectionActive) {
     sidebarStatus.textContent = 'Attention';
     heroEl.className = 'status-hero yellow';
     heroTitle.textContent = 'Attention Needed: Tamper Protection On';
-    heroDesc.textContent = 'Windows Defender Tamper Protection is blocking policy locks (yellow tray icon). Turn it off once in Windows Security.';
-    heroAction.innerHTML = '<button class="warn" onclick="apiCall(\'/api/open-winsec\')">Open Windows Security</button>';
+    heroDesc.textContent = 'Windows Defender Tamper Protection is blocking policy locks. Turn it off once in Windows Security.';
+    setHeroButton('Open Windows Security', 'warn', () => apiCall('/api/open-winsec'));
   } else if (!st.inCompliance) {
     sidebarStatus.textContent = 'Attention';
     heroEl.className = 'status-hero yellow';
-    heroTitle.textContent = `Attention Needed: ${st.driftItems.length} Drift Item(s)`;
-    heroDesc.textContent = 'Live Defender settings differ from your configuration (yellow tray icon).';
-    heroAction.innerHTML = '';
+    heroTitle.textContent = `Attention Needed: ${(st.driftItems || []).length} Drift Item(s)`;
+    heroDesc.textContent = 'Live Defender settings differ from your configuration.';
   } else if (!st.realtimeProtection) {
     sidebarStatus.textContent = 'Real-Time Off';
     heroEl.className = 'status-hero red';
     heroTitle.textContent = 'Real-Time Off · ' + levelName;
-    heroDesc.textContent = 'On-access scanning is disabled (red tray icon). Manual scans and definition updates remain available.';
-    heroAction.innerHTML = '';
+    heroDesc.textContent = 'On-access scanning is disabled. Manual scans and definition updates remain available.';
   } else {
     sidebarStatus.textContent = 'Protected';
     heroEl.className = 'status-hero green';
     heroTitle.textContent = 'Protected · ' + levelName;
-    heroDesc.textContent = 'Real-Time Protection is active and settings match your configuration (green tray icon).';
-    heroAction.innerHTML = '';
+    heroDesc.textContent = 'Real-Time Protection is active and settings match your configuration.';
   }
 
-  // Elevation Pill & Apply Now availability
+  // Elevation Pill
   const elevEl = document.getElementById('elevationBadge');
   const btnElev = document.getElementById('btnElevate');
   if (st.isElevated) {
@@ -1137,78 +1170,81 @@ function renderState(data) {
     btnElev.style.display = 'inline-block';
   }
 
-  const savedOrd = data.orders;
-
   // Preset Mode Badge
   const modeBadge = document.getElementById('presetModeBadge');
-  if (data.firstRun || ord.presetName === 'unconfigured') {
-    modeBadge.className = 'pill accent';
+  modeBadge.className = 'pill accent';
+  if (mode === 'unconfigured' && !stagedConfig) {
     modeBadge.textContent = 'Not Configured';
-  } else if (ord.presetName === 'custom') {
-    modeBadge.className = 'pill accent';
+  } else if (mode === 'passive' && !stagedConfig) {
+    modeBadge.textContent = 'Passive Mode';
+  } else if (pol.presetId === 'custom' || !pol.presetId) {
     modeBadge.textContent = 'Custom Override';
   } else {
-    const m = PRESET_META[ord.presetName];
-    modeBadge.className = 'pill accent';
-    modeBadge.textContent = m ? m.title : ord.presetName;
+    const m = PRESET_META[pol.presetId];
+    modeBadge.textContent = m ? m.title : pol.presetId;
   }
 
-  // Sidebar Presets
+  // Sidebar Presets (already ordered canonically by backend)
   const sbPresets = document.getElementById('sidebarPresets');
-  sbPresets.innerHTML = '';
-  const orderedPresets = [...(data.presets || [])].sort((a, b) => {
-    const ia = PRESET_ORDER.indexOf(a.id);
-    const ib = PRESET_ORDER.indexOf(b.id);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
-  orderedPresets.forEach(p => {
-    const meta = PRESET_META[p.id] || { title: p.name, bg: 'var(--accent-dim)', fg: 'var(--accent)', icon: '' };
-    const isActive = activeTab === 'orders' && ord.presetName === p.id;
+  sbPresets.textContent = '';
+  (data.presets || []).forEach(p => {
+    const meta = PRESET_META[p.id] || { title: p.shortName || p.name, bg: 'var(--accent-dim)', fg: 'var(--accent)', icon: '' };
+    const isActive = activeTab === 'orders' && (mode === 'active' || stagedConfig) && pol.presetId === p.id;
     const item = document.createElement('div');
     item.className = 'nav-item' + (isActive ? ' active' : '');
-    item.onclick = () => {
+    item.addEventListener('click', () => {
       if (activeTab !== 'orders') switchTab('orders');
       applyPreset(p.id);
-    };
-    item.onmouseenter = () => previewPreset(p.id);
-    item.onmouseleave = () => clearPresetPreview();
-    item.innerHTML = `
-      <span class="nav-icon" style="background: ${meta.bg}; color: ${meta.fg};">${meta.icon}</span>
-      <span class="nav-item-text">${meta.title}</span>
-    `;
+    });
+    item.addEventListener('mouseenter', () => previewPreset(p.id));
+    item.addEventListener('mouseleave', () => clearPresetPreview());
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'nav-icon';
+    iconSpan.style.background = meta.bg;
+    iconSpan.style.color = meta.fg;
+    iconSpan.innerHTML = meta.icon;
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'nav-item-text';
+    textSpan.textContent = meta.title;
+
+    item.appendChild(iconSpan);
+    item.appendChild(textSpan);
     sbPresets.appendChild(item);
   });
 
-  document.getElementById('navControls').classList.toggle('active', activeTab === 'orders' && (data.firstRun || ord.presetName === 'custom' || ord.presetName === 'unconfigured'));
+  document.getElementById('navControls').classList.toggle('active', activeTab === 'orders' && isCustomOrUnconfigured(data, stagedConfig));
   document.getElementById('navOps').classList.toggle('active', activeTab === 'ops');
   document.getElementById('navLogs').classList.toggle('active', activeTab === 'logs');
 
-  // Form controls + On/Off text
+  // Form controls
   const setSwitch = (chkId, stateId, val) => {
     document.getElementById(chkId).checked = !!val;
     document.getElementById(stateId).textContent = val ? 'On' : 'Off';
   };
-  setSwitch('chkRealtime', 'stateRtp', ord.realtimeProtection);
-  setSwitch('chkBehavior', 'stateBm', ord.behaviorMonitoring);
-  setSwitch('chkIOAV', 'stateIoav', ord.ioavProtection);
-  setSwitch('chkScript', 'stateScript', ord.scriptScanning);
-  setSwitch('chkSuppressAllNags', 'stateNags', ord.suppressAllNags);
-  setSwitch('chkMuteSystray', 'stateTray', ord.muteWindowsSecSystray);
-  setSwitch('chkStartupEnabled', 'stateStartup', ord.startupEnabled);
-  setSwitch('chkEnforceLoop', 'stateLoop', ord.enforceLoop);
-  setSwitch('chkCheckUpdates', 'stateUpdates', ord.checkUpdatesOnStart);
+  setSwitch('chkRealtime', 'stateRtp', pol.realtimeProtection);
+  setSwitch('chkBehavior', 'stateBm', pol.behaviorMonitoring);
+  setSwitch('chkIOAV', 'stateIoav', pol.ioavProtection);
+  setSwitch('chkScript', 'stateScript', pol.scriptScanning);
+  setSwitch('chkSuppressAllNags', 'stateNags', pol.suppressAllNags);
+  setSwitch('chkMuteSystray', 'stateTray', pol.muteWindowsSecSystray);
+  setSwitch('chkStartupEnabled', 'stateStartup', prefs.startupEnabled);
+  setSwitch('chkEnforceLoop', 'stateLoop', prefs.autoHeal);
+  setSwitch('chkCheckUpdates', 'stateUpdates', prefs.checkUpdatesOnStart);
 
-  const isUnconfigured = (data.firstRun || savedOrd.presetName === 'unconfigured') && !stagedOrders;
+  const isUnconfigured = mode === 'unconfigured' && !stagedConfig;
   const settingsBadge = document.getElementById('settingsModeBadge');
   if (settingsBadge) {
     settingsBadge.style.display = isUnconfigured ? 'inline-flex' : 'none';
   }
-  if (isUnconfigured && !ord.enforceLoop) {
+  if (isUnconfigured && !prefs.autoHeal) {
     document.getElementById('stateLoop').textContent = 'Not Configured';
   }
   const selDrift = document.getElementById('selDriftInterval');
-  selDrift.value = String(ord.driftCheckSeconds || 15);
-  selDrift.disabled = !ord.enforceLoop;
+  selDrift.value = String(prefs.driftCheckSeconds || 15);
+  selDrift.disabled = !prefs.autoHeal;
+
   if (data.update && data.update.checked) {
     const uEl = document.getElementById('updateStatusText');
     if (data.update.error) {
@@ -1220,16 +1256,16 @@ function renderState(data) {
     }
   }
 
-  document.getElementById('selCloud').value = String(ord.cloudProtection);
-  document.getElementById('selSamples').value = String(ord.sampleSubmission);
-  document.getElementById('selNetwork').value = String(ord.networkProtection);
+  document.getElementById('selCloud').value = String(pol.cloudProtection);
+  document.getElementById('selSamples').value = String(pol.sampleSubmission);
+  document.getElementById('selNetwork').value = String(pol.networkProtection);
 
   if (document.activeElement !== document.getElementById('txtWatchProcs')) {
-    document.getElementById('txtWatchProcs').value = (ord.autoStandDownProcesses || []).join(', ');
+    document.getElementById('txtWatchProcs').value = (pol.autoPauseProcesses || []).join(', ');
   }
   updateApplyButtonState();
 
-  // Live tags (only shown when live Defender state differs from configured setting)
+  // Live tags (shown when live Defender state differs from configured policy)
   const setLive = (id, text, matches) => {
     const el = document.getElementById(id);
     if (matches) {
@@ -1241,15 +1277,15 @@ function renderState(data) {
       el.className = 'live-tag off';
     }
   };
-  setLive('liveRtpTag', st.realtimeProtection ? 'ON' : 'OFF', !!st.realtimeProtection === !!ord.realtimeProtection || sd.active);
-  setLive('liveBmTag', st.behaviorMonitoring ? 'ON' : 'OFF', !!st.behaviorMonitoring === !!ord.behaviorMonitoring);
-  setLive('liveIoavTag', st.ioavProtection ? 'ON' : 'OFF', !!st.ioavProtection === !!ord.ioavProtection);
-  setLive('liveScriptTag', st.scriptScanning ? 'ON' : 'OFF', !!st.scriptScanning === !!ord.scriptScanning);
-  setLive('liveNetTag', st.networkProtection === 0 ? 'OFF' : (st.networkProtection === 1 ? 'Block' : 'Audit'), st.networkProtection === ord.networkProtection);
-  setLive('liveCloudTag', st.cloudProtection === 0 ? 'OFF' : (st.cloudProtection === 1 ? 'Basic' : 'Adv'), st.cloudProtection === ord.cloudProtection);
-  setLive('liveSamplesTag', st.sampleSubmission === 2 ? 'Never' : String(st.sampleSubmission), st.sampleSubmission === ord.sampleSubmission);
-  setLive('liveNagTag', st.nagsSuppressed ? 'Silenced' : 'Active', !!st.nagsSuppressed === !!ord.suppressAllNags);
-  setLive('liveTrayTag', st.securityTrayIconMuted ? 'Muted' : 'Visible', !!st.securityTrayIconMuted === !!ord.muteWindowsSecSystray);
+  setLive('liveRtpTag', st.realtimeProtection ? 'ON' : 'OFF', !!st.realtimeProtection === !!pol.realtimeProtection || pause.active);
+  setLive('liveBmTag', st.behaviorMonitoring ? 'ON' : 'OFF', !!st.behaviorMonitoring === !!pol.behaviorMonitoring);
+  setLive('liveIoavTag', st.ioavProtection ? 'ON' : 'OFF', !!st.ioavProtection === !!pol.ioavProtection);
+  setLive('liveScriptTag', st.scriptScanning ? 'ON' : 'OFF', !!st.scriptScanning === !!pol.scriptScanning);
+  setLive('liveNetTag', st.networkProtection === 0 ? 'OFF' : (st.networkProtection === 1 ? 'Block' : 'Audit'), st.networkProtection === pol.networkProtection);
+  setLive('liveCloudTag', st.cloudProtection === 0 ? 'OFF' : (st.cloudProtection === 1 ? 'Basic' : 'Adv'), st.cloudProtection === pol.cloudProtection);
+  setLive('liveSamplesTag', st.sampleSubmission === 2 ? 'Never' : String(st.sampleSubmission), st.sampleSubmission === pol.sampleSubmission);
+  setLive('liveNagTag', st.nagsSuppressed ? 'Silenced' : 'Active', !!st.nagsSuppressed === !!pol.suppressAllNags);
+  setLive('liveTrayTag', st.securityTrayIconMuted ? 'Muted' : 'Visible', !!st.securityTrayIconMuted === !!pol.muteWindowsSecSystray);
 
   // Telemetry KV
   document.getElementById('kvTamper').textContent = st.tamperProtectionActive
@@ -1260,38 +1296,50 @@ function renderState(data) {
   document.getElementById('kvSig').textContent = st.signatureVersion || '-';
   document.getElementById('cfgPathLabel').textContent = data.configPath || 'config.json';
 
-  // Audit Log
+  // Audit Log (safe DOM construction — no innerHTML to prevent stored XSS)
   const auditEl = document.getElementById('auditList');
-  auditEl.innerHTML = '';
+  auditEl.textContent = '';
   (data.auditLog || []).forEach(entry => {
     const row = document.createElement('div');
     row.className = 'audit-item';
-    const ts = new Date(entry.timestamp).toLocaleTimeString();
-    row.innerHTML = `<span class="ts">[${ts}]</span><span class="cat">${entry.category}</span>${entry.message}`;
+
+    const tsSpan = document.createElement('span');
+    tsSpan.className = 'ts';
+    tsSpan.textContent = '[' + new Date(entry.timestamp).toLocaleTimeString() + ']';
+
+    const catSpan = document.createElement('span');
+    catSpan.className = 'cat';
+    catSpan.textContent = entry.category || '';
+
+    row.appendChild(tsSpan);
+    row.appendChild(catSpan);
+    row.appendChild(document.createTextNode(entry.message || ''));
     auditEl.appendChild(row);
   });
 
   renderPresetDiffPreview();
 }
 
-function ordersEqual(a, b) {
+function configSlicesEqual(a, b) {
   if (!a || !b) return false;
-  const watchA = (a.autoStandDownProcesses || []).join(',');
-  const watchB = (b.autoStandDownProcesses || []).join(',');
-  return (a.presetName || '') === (b.presetName || '') &&
-    !!a.realtimeProtection === !!b.realtimeProtection &&
-    !!a.behaviorMonitoring === !!b.behaviorMonitoring &&
-    !!a.ioavProtection === !!b.ioavProtection &&
-    !!a.scriptScanning === !!b.scriptScanning &&
-    a.networkProtection === b.networkProtection &&
-    a.cloudProtection === b.cloudProtection &&
-    a.sampleSubmission === b.sampleSubmission &&
-    !!a.suppressAllNags === !!b.suppressAllNags &&
-    !!a.muteWindowsSecSystray === !!b.muteWindowsSecSystray &&
-    !!a.startupEnabled === !!b.startupEnabled &&
-    !!a.enforceLoop === !!b.enforceLoop &&
-    (a.driftCheckSeconds || 15) === (b.driftCheckSeconds || 15) &&
-    !!a.checkUpdatesOnStart === !!b.checkUpdatesOnStart &&
+  const ap = a.policy, bp = b.policy;
+  const apr = a.preferences, bpr = b.preferences;
+  const watchA = (ap.autoPauseProcesses || []).join(',');
+  const watchB = (bp.autoPauseProcesses || []).join(',');
+  return (ap.presetId || '') === (bp.presetId || '') &&
+    !!ap.realtimeProtection === !!bp.realtimeProtection &&
+    !!ap.behaviorMonitoring === !!bp.behaviorMonitoring &&
+    !!ap.ioavProtection === !!bp.ioavProtection &&
+    !!ap.scriptScanning === !!bp.scriptScanning &&
+    ap.networkProtection === bp.networkProtection &&
+    ap.cloudProtection === bp.cloudProtection &&
+    ap.sampleSubmission === bp.sampleSubmission &&
+    !!ap.suppressAllNags === !!bp.suppressAllNags &&
+    !!ap.muteWindowsSecSystray === !!bp.muteWindowsSecSystray &&
+    !!apr.startupEnabled === !!bpr.startupEnabled &&
+    !!apr.autoHeal === !!bpr.autoHeal &&
+    (apr.driftCheckSeconds || 15) === (bpr.driftCheckSeconds || 15) &&
+    !!apr.checkUpdatesOnStart === !!bpr.checkUpdatesOnStart &&
     watchA === watchB;
 }
 
@@ -1299,49 +1347,55 @@ function updateApplyButtonState() {
   const btnApply = document.getElementById('btnApplyNow');
   if (!btnApply || !currentState) return;
   const st = currentState.status;
-  const staged = stagedOrders || currentState.orders;
-  const hasEdits = !ordersEqual(staged, currentState.orders);
-  const needsSync = !currentState.firstRun && !st.inCompliance;
+  const mode = currentState.config.mode;
+  const hasEdits = stagedConfig && !configSlicesEqual(stagedConfig, currentState.config);
+  const needsSync = mode === 'active' && !st.inCompliance;
 
   if (!st.isElevated) {
     btnApply.disabled = true;
     btnApply.title = 'Administrator privileges required to apply changes';
   } else if (!hasEdits && !needsSync) {
     btnApply.disabled = true;
-    btnApply.title = currentState.firstRun ? 'Select a preset or adjust a setting first' : 'All settings are already applied';
+    btnApply.title = mode !== 'active' ? 'Select a preset or adjust a setting first' : 'All settings are already applied';
   } else {
     btnApply.disabled = false;
     btnApply.title = '';
   }
 }
 
-function readOrdersFromForm(baseOrders, presetName) {
+function readConfigFromForm(baseSlice, presetId) {
   const watchRaw = document.getElementById('txtWatchProcs').value;
   const watchList = watchRaw.split(',').map(s => s.trim()).filter(Boolean);
   return {
-    ...baseOrders,
-    presetName: presetName,
-    startupEnabled: document.getElementById('chkStartupEnabled').checked,
-    enforceLoop: document.getElementById('chkEnforceLoop').checked,
-    driftCheckSeconds: parseInt(document.getElementById('selDriftInterval').value, 10) || 15,
-    checkUpdatesOnStart: document.getElementById('chkCheckUpdates').checked,
-    suppressAllNags: document.getElementById('chkSuppressAllNags').checked,
-    suppressEnhancedNags: document.getElementById('chkSuppressAllNags').checked,
-    muteWindowsSecSystray: document.getElementById('chkMuteSystray').checked,
-    cloudProtection: parseInt(document.getElementById('selCloud').value, 10),
-    sampleSubmission: parseInt(document.getElementById('selSamples').value, 10),
-    realtimeProtection: document.getElementById('chkRealtime').checked,
-    behaviorMonitoring: document.getElementById('chkBehavior').checked,
-    ioavProtection: document.getElementById('chkIOAV').checked,
-    scriptScanning: document.getElementById('chkScript').checked,
-    networkProtection: parseInt(document.getElementById('selNetwork').value, 10),
-    autoStandDownProcesses: watchList,
+    policy: {
+      ...baseSlice.policy,
+      presetId: presetId,
+      suppressAllNags: document.getElementById('chkSuppressAllNags').checked,
+      suppressEnhancedNags: document.getElementById('chkSuppressAllNags').checked,
+      muteWindowsSecSystray: document.getElementById('chkMuteSystray').checked,
+      cloudProtection: parseInt(document.getElementById('selCloud').value, 10),
+      sampleSubmission: parseInt(document.getElementById('selSamples').value, 10),
+      realtimeProtection: document.getElementById('chkRealtime').checked,
+      behaviorMonitoring: document.getElementById('chkBehavior').checked,
+      ioavProtection: document.getElementById('chkIOAV').checked,
+      scriptScanning: document.getElementById('chkScript').checked,
+      networkProtection: parseInt(document.getElementById('selNetwork').value, 10),
+      autoPauseProcesses: watchList,
+    },
+    preferences: {
+      ...baseSlice.preferences,
+      startupEnabled: document.getElementById('chkStartupEnabled').checked,
+      autoHeal: document.getElementById('chkEnforceLoop').checked,
+      driftCheckSeconds: parseInt(document.getElementById('selDriftInterval').value, 10) || 15,
+      checkUpdatesOnStart: document.getElementById('chkCheckUpdates').checked,
+    },
   };
 }
 
-function stageOrdersFromUI(skipRender) {
+function stageFromUI(skipRender) {
   if (!currentState) return;
-  stagedOrders = readOrdersFromForm(stagedOrders || currentState.orders, 'custom');
+  const base = stagedConfig || cloneConfigSlice(currentState.config);
+  stagedConfig = readConfigFromForm(base, 'custom');
   if (skipRender) {
     updateApplyButtonState();
     return;
@@ -1350,21 +1404,21 @@ function stageOrdersFromUI(skipRender) {
 }
 
 function saveOrdersFromUI() {
-  stageOrdersFromUI(false);
+  stageFromUI(false);
 }
 
 function applyPreset(id) {
   if (!currentState) return;
   const preset = (currentState.presets || []).find(p => p.id === id);
   if (!preset) return;
-  const cur = stagedOrders || currentState.orders;
-  stagedOrders = {
-    ...preset.orders,
-    presetName: preset.id,
-    startupEnabled: cur.startupEnabled,
-    enforceLoop: cur.enforceLoop,
-    driftCheckSeconds: cur.driftCheckSeconds || 15,
-    checkUpdatesOnStart: cur.checkUpdatesOnStart,
+  const curPrefs = (stagedConfig || currentState.config).preferences;
+  stagedConfig = {
+    policy: {
+      ...preset.policy,
+      presetId: preset.id,
+      autoPauseProcesses: [...(preset.policy.autoPauseProcesses || [])],
+    },
+    preferences: { ...curPrefs },
   };
   renderState(currentState);
 }
@@ -1384,46 +1438,57 @@ function closeAutoHealModal() {
 async function finishFirstRunApply() {
   closeAutoHealModal();
   if (!currentState) return;
-  const base = stagedOrders || currentState.orders;
-  const orders = {
-    ...readOrdersFromForm(base, base.presetName || 'custom'),
-    elected: true,
+  const base = stagedConfig || cloneConfigSlice(currentState.config);
+  const next = readConfigFromForm(base, base.policy.presetId || 'custom');
+  next.preferences = {
     startupEnabled: document.getElementById('chkConsentStartup').checked,
-    enforceLoop: document.getElementById('chkConsentAutoHeal').checked,
+    autoHeal: document.getElementById('chkConsentAutoHeal').checked,
     driftCheckSeconds: parseInt(document.getElementById('selConsentInterval').value, 10) || 15,
     checkUpdatesOnStart: document.getElementById('chkConsentUpdates').checked,
   };
-  const res = await fetch('/api/orders', {
+  const res = await apiFetch('/api/config', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(orders)
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mode: 'active',
+      policy: next.policy,
+      preferences: next.preferences,
+    }),
   });
   const out = await res.json();
-  stagedOrders = null;
+  stagedConfig = null;
   showToast(out.message || 'Configuration applied');
   fetchState();
 }
 
-async function standDown(minutes) {
-  const res = await fetch('/api/standdown?minutes=' + minutes, { method: 'POST' });
+async function pauseProtection(minutes) {
+  const res = await apiFetch('/api/pause', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ minutes: minutes }),
+  });
   const out = await res.json();
   showToast(out.message || 'Pause state updated');
   fetchState();
 }
 
+function standDown(minutes) {
+  return pauseProtection(minutes);
+}
+
 async function enterPassiveMode() {
-  const res = await fetch('/api/passive', { method: 'POST' });
+  const res = await apiFetch('/api/passive', { method: 'POST' });
   const out = await res.json();
-  stagedOrders = null;
+  stagedConfig = null;
   showToast(out.message || 'Entered Passive Mode');
   fetchState();
 }
 
 async function applyChanges() {
   if (!currentState) return;
-  if (currentState.firstRun) {
+  if (currentState.config.mode === 'unconfigured') {
     document.getElementById('chkConsentStartup').checked = document.getElementById('chkStartupEnabled').checked;
-    document.getElementById('chkConsentAutoHeal').checked = stagedOrders
+    document.getElementById('chkConsentAutoHeal').checked = stagedConfig
       ? document.getElementById('chkEnforceLoop').checked
       : true;
     document.getElementById('selConsentInterval').value = document.getElementById('selDriftInterval').value || '15';
@@ -1435,18 +1500,19 @@ async function applyChanges() {
   btnApply.disabled = true;
   btnApply.textContent = 'Applying...';
   try {
-    const base = stagedOrders || currentState.orders;
-    const orders = {
-      ...readOrdersFromForm(base, base.presetName || 'custom'),
-      elected: true,
-    };
-    const res = await fetch('/api/orders', {
+    const base = stagedConfig || cloneConfigSlice(currentState.config);
+    const next = readConfigFromForm(base, base.policy.presetId || 'custom');
+    const res = await apiFetch('/api/config', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(orders)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'active',
+        policy: next.policy,
+        preferences: next.preferences,
+      }),
     });
     const out = await res.json();
-    stagedOrders = null;
+    stagedConfig = null;
     showToast(out.message || 'Settings applied');
     await fetchState();
   } finally {
@@ -1456,14 +1522,14 @@ async function applyChanges() {
 }
 
 async function elevateApp() {
-  const res = await fetch('/api/elevate', { method: 'POST' });
+  const res = await apiFetch('/api/elevate', { method: 'POST' });
   const out = await res.json();
   showToast(out.message || 'Launching Administrator prompt...');
 }
 
 async function apiCall(path) {
   showToast('Working...');
-  const res = await fetch(path, { method: 'POST' });
+  const res = await apiFetch(path, { method: 'POST' });
   const out = await res.json();
   showToast(out.message || 'Done');
   fetchState();
