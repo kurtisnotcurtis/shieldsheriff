@@ -76,7 +76,7 @@ $sc = $ws.CreateShortcut($lnkPath)
 $sc.TargetPath = $exePath
 $sc.Arguments = "ui --elevate"
 $sc.WorkingDirectory = $binDir
-$sc.Description = "Launch ShieldSheriff Command Center UI & System Tray"
+$sc.Description = "Launch ShieldSheriff Dashboard UI & System Tray"
 $sc.WindowStyle = 7
 $sc.Save()
 

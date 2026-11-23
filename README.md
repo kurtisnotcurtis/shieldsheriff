@@ -21,7 +21,7 @@
 
 ## Why ShieldSheriff?
 
-Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a capable local antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags whenever you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**—and Windows Updates regularly flip your settings back on.
+Windows 11's built-in Microsoft Defender (`MsMpEng.exe`) is a capable local antivirus engine, but its notification layer (`SecurityHealthService.exe` / `SecurityHealthSystray.exe`) relentlessly nags whenever you intentionally turn off **Cloud-delivered protection**, **Automatic sample submission**, **Tamper protection**, or **Real-time protection**, and Windows Updates regularly flip your settings back on.
 
 **ShieldSheriff** is a lightweight (~5 MB), single-binary Windows 11 Defender governor that keeps Defender under your rules using native Windows policies rather than service-killing hacks or fake third-party antivirus registration:
 

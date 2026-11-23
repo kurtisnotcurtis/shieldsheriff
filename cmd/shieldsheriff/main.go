@@ -258,7 +258,7 @@ func runStatus(args []string) {
 	}
 
 	fmt.Println("================================================================")
-	fmt.Printf("  SHIELDSHERIFF v%s (%s) — DEFENDER STATUS & CONFIGURATION\n", version.Version, version.Codename)
+	fmt.Printf("  SHIELDSHERIFF v%s (%s) - DEFENDER STATUS & CONFIGURATION\n", version.Version, version.Codename)
 	fmt.Println("================================================================")
 	fmt.Printf("  Privilege Level     : %s\n", map[bool]string{true: "Elevated (Administrator / SYSTEM)", false: "Standard User (Read-Only)"}[st.IsElevated])
 	fmt.Printf("  Configuration       : %s (%s)\n", ord.PresetName, cfgPath)
@@ -266,7 +266,7 @@ func runStatus(args []string) {
 		map[bool]string{true: "RUNNING", false: "STOPPED"}[st.ServiceRunning],
 		st.PlatformVersion, st.SignatureVersion)
 	fmt.Printf("  Tamper Protection   : %s (raw=0x%x)\n",
-		map[bool]string{true: "ON  [Blocks policy writes — toggle OFF once in Windows Security]", false: "OFF [Ready for ShieldSheriff]"}[st.TamperProtectionActive],
+		map[bool]string{true: "ON  [Blocks policy writes - toggle OFF once in Windows Security]", false: "OFF [Ready for ShieldSheriff]"}[st.TamperProtectionActive],
 		st.TamperProtectionRaw)
 	if sd.Active {
 		fmt.Printf("  Pause Status        : ACTIVE (%s)\n", sd.Reason)
@@ -551,7 +551,7 @@ func runVersion(args []string) {
 }
 
 func printUsage() {
-	fmt.Printf("ShieldSheriff v%s (%s) — Simple, Nag-Free Control for Windows Defender\n\n", version.Version, version.Codename)
+	fmt.Printf("ShieldSheriff v%s (%s) - Simple, Nag-Free Control for Windows Defender\n\n", version.Version, version.Codename)
 	fmt.Println(`Usage:
   shieldsheriff                         Inspect live Defender status (read-only) and exit
   shieldsheriff ui [--elevate]          Launch Dashboard UI (Read-Only window without tray unless --elevate)

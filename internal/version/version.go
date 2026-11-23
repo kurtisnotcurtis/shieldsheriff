@@ -6,10 +6,10 @@ import "fmt"
 // Version and ReleasedOn can be overridden at build time via -ldflags -X from VERSION.json.
 var (
 	// Version is the current CalVer release of ShieldSheriff.
-	Version = "2026.11.8"
+	Version = "2026.11.9"
 
 	// ReleasedOn is the ISO-8601 release date (EST/EDT).
-	ReleasedOn = "2026-11-18"
+	ReleasedOn = "2026-11-23"
 )
 
 const (
@@ -58,7 +58,7 @@ func Short() string {
 // Summary returns a multi-line human-readable version & platform compatibility summary.
 func Summary() string {
 	return fmt.Sprintf(
-		"ShieldSheriff v%s %q (CalVer YYYY.0M.MICRO — released %s)\n"+
+		"ShieldSheriff v%s %q (CalVer YYYY.0M.MICRO, released %s)\n"+
 			"  Windows Baseline  : %s\n"+
 			"  Defender Platform : %s\n"+
 			"  Policy/WMI Schema : %s",

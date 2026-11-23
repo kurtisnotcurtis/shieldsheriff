@@ -17,6 +17,16 @@ Machine-readable release and platform compatibility metadata is also maintained 
 
 ---
 
+## [2026.11.9] (2026-11-23)
+
+* **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)
+* **Defender Platform Baseline:** `4.18.26100.5`
+
+### Changed
+- **Executable Metadata & Copy Cleanup (`cmd/shieldsheriff/winres/winres.json`, `internal/sheriff/service.go`, `cmd/shieldsheriff/main.go`, `internal/version/version.go`, `build.ps1`, `packaging/chocolatey/tools/chocolateyinstall.ps1`):** Simplified the embedded PE `FileDescription` to `ShieldSheriff` (for clean display in Windows Task Manager / Startup) and removed remaining em-dashes and legacy *Standing Orders* / *Command Center* wording from the manifest description, Windows Service description, CLI output, version summary, and `.lnk` shortcut descriptions.
+
+---
+
 ## [2026.11.8] (2026-11-18)
 
 * **Windows Baseline:** Windows 11 24H2 / 25H2 (`26100.2314+`)

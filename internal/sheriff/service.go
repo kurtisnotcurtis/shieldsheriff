@@ -11,7 +11,7 @@ import (
 
 const ServiceName = "ShieldSheriff"
 const ServiceDisplayName = "ShieldSheriff Defender Governor"
-const ServiceDescription = "User-elected orchestrator that enforces granular Windows Defender Standing Orders and suppresses Windows Security nags."
+const ServiceDescription = "Enforces granular Windows Defender settings and suppresses Windows Security notifications."
 
 var (
 	modAdvapi32                       = syscall.NewLazyDLL("advapi32.dll")

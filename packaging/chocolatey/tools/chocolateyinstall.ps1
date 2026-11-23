@@ -38,5 +38,5 @@ if ($programsDir) {
         -TargetPath (Join-Path $toolsDir 'shiesh.exe') `
         -Arguments 'ui --elevate' `
         -WorkingDirectory $toolsDir `
-        -Description 'Launch ShieldSheriff Command Center UI & System Tray'
+        -Description 'Launch ShieldSheriff Dashboard UI & System Tray'
 }
