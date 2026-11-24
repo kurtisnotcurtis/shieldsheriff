@@ -23,7 +23,7 @@ jobs:
         run: |
           $unformatted = gofmt -l .
           if ($unformatted) {
-            Write-Error "Unformatted Go files:`n$unformatted"
+            Write-Error ("Unformatted Go files:`n" + ($unformatted -join "`n"))
             exit 1
           }
 
